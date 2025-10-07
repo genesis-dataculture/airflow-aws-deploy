@@ -130,7 +130,13 @@ resource "aws_ecs_task_definition" "airflow_webserver" {
         { name = "AIRFLOW_S3_BUCKET", value = var.s3_bucket_name },
         { name = "AIRFLOW_S3_DAGS_PATH", value = "dags" },
         { name = "AIRFLOW__WEBSERVER__EXPOSE_CONFIG", value = "true" },
-        { name = "AIRFLOW__WEBSERVER__RBAC", value = "true" }
+        { name = "AIRFLOW__WEBSERVER__RBAC", value = "true" },
+        # --- Remote logging S3 (novos) ---
+        { name = "AIRFLOW_S3_LOGS_PATH", value = "airflow/logs" },
+        { name = "AIRFLOW__LOGGING__REMOTE_LOGGING", value = "true" },
+        { name = "AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER", value = "s3://${var.s3_bucket_name}/airflow/logs" },
+        { name = "AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID", value = "aws_default" },
+        { name = "AWS_DEFAULT_REGION", value = "us-east-1" }
       ],
       
       portMappings = [
@@ -186,7 +192,13 @@ resource "aws_ecs_task_definition" "airflow_scheduler" {
         { name = "AIRFLOW_CONN_AWS_DEFAULT", value = "aws://" },
         { name = "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION", value = "false" },
         { name = "AIRFLOW_S3_BUCKET", value = var.s3_bucket_name },
-        { name = "AIRFLOW_S3_DAGS_PATH", value = "dags" }
+        { name = "AIRFLOW_S3_DAGS_PATH", value = "dags" },
+        # --- Remote logging S3 (novos) ---
+        { name = "AIRFLOW_S3_LOGS_PATH", value = "airflow/logs" },
+        { name = "AIRFLOW__LOGGING__REMOTE_LOGGING", value = "true" },
+        { name = "AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER", value = "s3://${var.s3_bucket_name}/airflow/logs" },
+        { name = "AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID", value = "aws_default" },
+        { name = "AWS_DEFAULT_REGION", value = "us-east-1" }
       ],
       
       logConfiguration = {
