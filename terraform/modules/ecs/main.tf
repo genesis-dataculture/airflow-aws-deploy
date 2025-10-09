@@ -50,10 +50,10 @@ resource "aws_security_group" "airflow_lb" {
 
 resource "aws_lb" "airflow" {
   name               = "airflow-alb"
-  internal           = false
+  internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.airflow_lb.id]
-  subnets            = var.public_subnet_ids
+  subnets            = var.private_subnet_ids
 
   tags = {
     Name = "airflow-alb"

@@ -34,3 +34,18 @@ variable "airflow_bucket_name" {
   description = "S3 bucket name for Airflow DAGs"
   type        = string
 }
+
+variable "vpc_id"{
+  description = "ID da VPC"
+  type = string
+}
+
+variable "subnet_id"{
+  description = "ID da subnet"
+  type = list(string)
+}
+
+variable "sg_id"{
+  description = "ID do Security Group"
+  type = string
+}
