@@ -3,10 +3,10 @@ output "airflow_ui_url" {
   value       = "http://${module.ecs.airflow_alb_dns}"
 }
 
-output "s3_bucket_name" {
-  description = "Nome do bucket S3 para armazenar as DAGs do Airflow"
-  value       = module.s3.bucket_name
-}
+# output "s3_bucket_name" {
+#   description = "Nome do bucket S3 para armazenar as DAGs do Airflow"
+#   value       = module.s3.bucket_name
+# }
 
 output "rds_endpoint" {
   description = "Endpoint do banco de dados RDS"

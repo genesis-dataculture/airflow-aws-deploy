@@ -15,8 +15,8 @@ A arquitetura deste projeto inclui:
 - **Amazon ECR**: Para armazenar a imagem personalizada do Airflow
 - **Application Load Balancer**: Para distribuir tráfego para o webserver
 
-
 ### 🔧 Componentes Principais
+
 - **Webserver**: Responsável pela interface web (http://load-balancer-dns)
 - **Scheduler**: Responsável pelo agendamento e execução de tarefas
 - **Sincronização S3**: Sincronização automática de DAGs a cada 30 segundos
@@ -30,12 +30,11 @@ A arquitetura deste projeto inclui:
 
 ## Configuração e Deploy
 
-
 ### 2. Construir a imagem Docker do Airflow
 
 ```bash
 cd docker
-docker build -t airflow-on-ecs-fargate .
+docker build --no-cache -t airflow-on-ecs-fargate .
 ```
 
 ### 3. Autenticar no Amazon ECR
@@ -147,10 +146,10 @@ aws s3 sync ./dags/ s3://airflow-dev-test-install/dags/
 Este sistema está configurado para sincronizar automaticamente as DAGs do bucket S3 com o diretório local do Airflow a cada 30 segundos. Sempre que você adicionar ou modificar uma DAG:
 
 1. Faça o upload da DAG para o bucket S3:
+
    ```bash
    aws s3 cp minha_dag.py s3://airflow-dev-test-install/dags/
    ```
-
 2. A DAG será sincronizada automaticamente com o container do Airflow em até 30 segundos.
 
 ## Como funciona a sincronização das DAGs
@@ -158,14 +157,12 @@ Este sistema está configurado para sincronizar automaticamente as DAGs do bucke
 O sistema de sincronização automática funciona da seguinte maneira:
 
 1. Quando o container do Airflow é iniciado, o script `entrypoint.sh` executa uma primeira sincronização com o comando `aws s3 sync`.
-
 2. Em seguida, um processo em background é iniciado para verificar e sincronizar as DAGs a cada 30 segundos.
-
 3. O comando `aws s3 sync` com a flag `--delete` garante que:
+
    - Novas DAGs sejam adicionadas
    - DAGs modificadas sejam atualizadas
    - DAGs removidas do S3 também sejam removidas do ambiente local
-
 4. O Airflow verifica periodicamente o diretório de DAGs para identificar alterações.
 
 ## Limpeza
@@ -176,4 +173,3 @@ Para destruir toda a infraestrutura quando não for mais necessária:
 cd terraform
 terraform destroy -var-file="terraform.tfvars"
 ```
-

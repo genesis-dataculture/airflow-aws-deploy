@@ -1,59 +1,59 @@
-resource "aws_security_group" "airflow_ecs" {
-  name        = "airflow-ecs-sg"
-  description = "Security group for Airflow ECS tasks"
-  vpc_id      = var.vpc_id
+# resource "aws_security_group" "airflow_ecs" {
+#   name        = "airflow-ecs-sg"
+#   description = "Security group for Airflow ECS tasks"
+#   vpc_id      = var.vpc_id
 
-  ingress {
-    description = "Airflow Webserver"
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#   ingress {
+#     description = "Airflow Webserver"
+#     from_port   = 8080
+#     to_port     = 8080
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-  tags = {
-    Name = "airflow-ecs-sg"
-  }
-}
+#   tags = {
+#     Name = "airflow-ecs-sg"
+#   }
+# }
 
-resource "aws_security_group" "airflow_lb" {
-  name        = "airflow-lb-sg"
-  description = "Security group for Airflow load balancer"
-  vpc_id      = var.vpc_id
+# resource "aws_security_group" "airflow_lb" {
+#   name        = "airflow-lb-sg"
+#   description = "Security group for Airflow load balancer"
+#   vpc_id      = var.vpc_id
 
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#   ingress {
+#     description = "HTTP"
+#     from_port   = 80
+#     to_port     = 80
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-  tags = {
-    Name = "airflow-lb-sg"
-  }
-}
+#   tags = {
+#     Name = "airflow-lb-sg"
+#   }
+# }
 
 resource "aws_lb" "airflow" {
   name               = "airflow-alb"
-  internal           = false
+  internal           = true
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.airflow_lb.id]
-  subnets            = var.public_subnet_ids
+  security_groups    = var.sg_id
+  subnets            = var.private_subnet_ids
 
   tags = {
     Name = "airflow-alb"
@@ -223,7 +223,7 @@ resource "aws_ecs_service" "airflow_webserver" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.airflow_ecs.id]
+    security_groups  = var.sg_id
     assign_public_ip = false
   }
 
@@ -245,7 +245,7 @@ resource "aws_ecs_service" "airflow_scheduler" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.airflow_ecs.id]
+    security_groups  = var.sg_id
     assign_public_ip = false
   }
 }

@@ -8,7 +8,7 @@ output "db_instance_name" {
   value       = aws_db_instance.airflow.db_name
 }
 
-output "db_security_group_id" {
-  description = "ID do grupo de segurança da base de dados"
-  value       = aws_security_group.airflow_db.id
-}
+# output "db_security_group_id" {
+#   description = "ID do grupo de segurança da base de dados"
+#   value       = aws_security_group.airflow_db.id
+# }

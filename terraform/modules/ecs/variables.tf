@@ -3,10 +3,15 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "public_subnet_ids" {
-  description = "IDs das sub-redes públicas"
-  type        = list(string)
+variable "sg_id"{
+  description = "ID do Security Group"
+  type = list(string)
 }
+
+# variable "public_subnet_ids" {
+#   description = "IDs das sub-redes públicas"
+#   type        = list(string)
+# }
 
 variable "private_subnet_ids" {
   description = "IDs das sub-redes privadas"

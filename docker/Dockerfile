@@ -10,8 +10,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # copie e ajuste as permissões como root
-COPY scripts/entrypoint.sh /entrypoint.sh
-RUN chmod 0755 /entrypoint.sh
+COPY /entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod 0755 /entrypoint.sh
 
 # volte para airflow antes de instalar python (se preferir)
 USER airflow
