@@ -1,7 +1,6 @@
 FROM apache/airflow:2.8.1-python3.10
 
 USER root
-# deps do sistema
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        build-essential default-libmysqlclient-dev awscli curl \
@@ -9,11 +8,10 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# copie e ajuste as permissões como root
-COPY scripts/entrypoint.sh /entrypoint.sh
-RUN chmod 0755 /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
+# remove CRLF e garante permissão de execução
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod 0755 /entrypoint.sh
 
-# volte para airflow antes de instalar python (se preferir)
 USER airflow
 COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir --user -r /requirements.txt
