@@ -1,6 +1,9 @@
 # module "networking" {
 #   source = "./modules/networking"
 # }
+# module "networking" {
+#   source = "./modules/networking"
+# }
 
 # module "s3" {
 #   source              = "./modules/s3"
@@ -9,6 +12,8 @@
 
 module "rds" {
   source       = "./modules/rds"
+  vpc_id       = var.vpc_id
+  subnet_ids   = var.subnet_id
   vpc_id       = var.vpc_id
   subnet_ids   = var.subnet_id
   db_name      = var.db_name
@@ -20,6 +25,9 @@ module "rds" {
 
 module "ecs" {
   source              = "./modules/ecs"
+  vpc_id              = var.vpc_id
+  # public_subnet_ids   = module.networking.public_subnet_ids
+  private_subnet_ids  = var.subnet_id
   vpc_id              = var.vpc_id
   # public_subnet_ids   = module.networking.public_subnet_ids
   private_subnet_ids  = var.subnet_id
