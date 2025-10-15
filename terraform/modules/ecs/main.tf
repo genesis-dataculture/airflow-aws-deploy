@@ -51,7 +51,6 @@
 resource "aws_lb" "airflow" {
   name               = "airflow-alb"
   internal           = true
-  internal           = true
   load_balancer_type = "application"
   security_groups    = var.sg_id
   subnets            = var.private_subnet_ids
