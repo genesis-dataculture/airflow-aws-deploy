@@ -7,7 +7,7 @@ Este documento descreve como fazer o deploy do projeto dbt para o ambiente AWS.
 O projeto dbt deve ser armazenado no S3 na seguinte estrutura:
 
 ```
-s3://airflow-dev-test-install/
+s3://ons-dev-dg-00-stage/
 ├── dags/                    # DAGs do Airflow (já existente)
 ├── dbt/                     # Projeto dbt (NOVO)
 │   ├── dbt_project.yml
@@ -40,20 +40,20 @@ Execute os seguintes comandos no PowerShell para fazer upload do projeto:
 cd C:\Users\fabio\Desktop\Genesis\airflow-docker-i
 
 # Upload do projeto dbt para S3
-aws s3 sync ./dbt/ s3://airflow-dev-test-install/dbt/ --exclude "target/*" --exclude "dbt_packages/*" --exclude "logs/*"
+aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "target/*" --exclude "dbt_packages/*" --exclude "logs/*"
 
 # Verificar upload
-aws s3 ls s3://airflow-dev-test-install/dbt/ --recursive
+aws s3 ls s3://ons-dev-dg-00-stage/dbt/ --recursive
 ```
 
 ### 2. Upload da DAG de Exemplo
 
 ```powershell
 # Upload da DAG dbt_athena_example
-aws s3 cp ./dags/dbt_athena_example.py s3://airflow-dev-test-install/dags/dbt_athena_example.py
+aws s3 cp ./dags/dbt_athena_example.py s3://ons-dev-dg-00-stage/dags/dbt_athena_example.py
 
 # Verificar upload
-aws s3 ls s3://airflow-dev-test-install/dags/
+aws s3 ls s3://ons-dev-dg-00-stage/dags/
 ```
 
 ## 🔧 Configuração AWS Necessária
@@ -87,20 +87,20 @@ aws athena list-work-groups
 # Criar workgroup se necessário
 aws athena create-work-group \
     --name primary \
-    --configuration "ResultConfigurationUpdates={OutputLocation=s3://airflow-dev-test-install/athena-results/}"
+    --configuration "ResultConfigurationUpdates={OutputLocation=s3://ons-dev-dg-00-stage/athena-results/}"
 ```
 
 ### 3. Estrutura de Buckets S3
 
 ```bash
 # Criar estrutura de pastas no S3
-aws s3api put-object --bucket airflow-dev-test-install --key dbt/
-aws s3api put-object --bucket airflow-dev-test-install --key dbt-data/staging/
-aws s3api put-object --bucket airflow-dev-test-install --key dbt-data/marts/
-aws s3api put-object --bucket airflow-dev-test-install --key dbt-data/seeds/
-aws s3api put-object --bucket airflow-dev-test-install --key athena-results/dev/
-aws s3api put-object --bucket airflow-dev-test-install --key athena-results/prod/
-aws s3api put-object --bucket airflow-dev-test-install --key raw-data/example/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/staging/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/marts/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/seeds/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/dev/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/prod/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key raw-data/example/
 ```
 
 ## 🔐 Permissões IAM Necessárias
@@ -149,8 +149,8 @@ A IAM Role do ECS Task precisa das seguintes permissões:
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::airflow-dev-test-install",
-        "arn:aws:s3:::airflow-dev-test-install/*"
+        "arn:aws:s3:::ons-dev-dg-00-stage",
+        "arn:aws:s3:::ons-dev-dg-00-stage/*"
       ]
     }
   ]
@@ -189,7 +189,7 @@ environment = [
   # dbt + Athena
   { name = "DBT_PROFILES_DIR", value = "/opt/airflow/dbt" },
   { name = "DBT_PROJECT_DIR", value = "/opt/airflow/dbt" },
-  { name = "DBT_ATHENA_S3_STAGING", value = "airflow-dev-test-install" },
+  { name = "DBT_ATHENA_S3_STAGING", value = "ons-dev-dg-00-stage" },
   { name = "AWS_DEFAULT_REGION", value = "us-east-1" }
 ]
 ```
@@ -227,7 +227,7 @@ aws glue get-tables --database-name analytics_dev
 # Query de teste no Athena
 aws athena start-query-execution \
     --query-string "SELECT * FROM analytics_dev.stg_example LIMIT 10" \
-    --result-configuration "OutputLocation=s3://airflow-dev-test-install/athena-results/test/"
+    --result-configuration "OutputLocation=s3://ons-dev-dg-00-stage/athena-results/test/"
 ```
 
 ## 🔄 Updates Futuros
@@ -236,7 +236,7 @@ Para atualizar o projeto dbt após mudanças:
 
 ```powershell
 # Upload apenas dos arquivos modificados
-aws s3 sync ./dbt/ s3://airflow-dev-test-install/dbt/ --exclude "target/*" --exclude "dbt_packages/*"
+aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "target/*" --exclude "dbt_packages/*"
 
 # O entrypoint.sh irá sincronizar automaticamente no container
 # Ou force a re-execução da DAG
@@ -261,3 +261,4 @@ aws s3 sync ./dbt/ s3://airflow-dev-test-install/dbt/ --exclude "target/*" --exc
 - Verifique upload para S3
 - Confirme sincronização no entrypoint.sh
 - Check logs: `AIRFLOW_S3_BUCKET` e `AIRFLOW_S3_DAGS_PATH`
+

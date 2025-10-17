@@ -3,7 +3,7 @@ default:
   outputs:
     dev:
       type: athena
-      s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'airflow-dev-test-install') }}/athena-results/dev/"
+      s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'ons-dev-dg-00-stage') }}/athena-results/dev/"
       region_name: us-east-1
       database: analytics_dev
       schema: dbt_dev
@@ -13,7 +13,7 @@ default:
       
     prod:
       type: athena
-      s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'airflow-dev-test-install') }}/athena-results/prod/"
+      s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'ons-dev-dg-00-stage') }}/athena-results/prod/"
       region_name: us-east-1
       database: analytics_prod
       schema: dbt_prod

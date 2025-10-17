@@ -6,7 +6,7 @@
         materialized='table',
         schema='marts',
         file_format='parquet',
-        location_root='s3://airflow-dev-test-install/dbt-data/marts',
+        location_root='s3://ons-dev-dg-00-stage/dbt-data/marts',
         table_type='hive',
         write_compression='snappy'
     )

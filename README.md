@@ -74,8 +74,8 @@ cat > airflow-s3-access-policy.json << EOF
         "s3:DeleteObject"
       ],
       "Resource": [
-        "arn:aws:s3:::airflow-dev-test-install",
-        "arn:aws:s3:::airflow-dev-test-install/*"
+        "arn:aws:s3:::ons-dev-dg-00-stage",
+        "arn:aws:s3:::ons-dev-dg-00-stage/*"
       ]
     }
   ]
@@ -115,7 +115,7 @@ db_username = "airflow"
 db_password = "airflow12345"
 iam_role_ecs = "arn:aws:iam::730335315247:role/airflow-task-execution-role"
 aws_ecr_repository = "730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest"
-airflow_bucket_name = "airflow-dev-test-install"
+airflow_bucket_name = "ons-dev-dg-00-stage"
 ```
 
 Em seguida, execute:
@@ -139,7 +139,7 @@ terraform output airflow_ui_url
 
 ```bash
 # Copiar as DAGs para o bucket S3
-aws s3 sync ./dags/ s3://airflow-dev-test-install/dags/
+aws s3 sync ./dags/ s3://ons-dev-dg-00-stage/dags/
 ```
 
 ## Atualização das DAGs
@@ -148,7 +148,7 @@ Este sistema está configurado para sincronizar automaticamente as DAGs do bucke
 
 1. Faça o upload da DAG para o bucket S3:
    ```bash
-   aws s3 cp minha_dag.py s3://airflow-dev-test-install/dags/
+   aws s3 cp minha_dag.py s3://ons-dev-dg-00-stage/dags/
    ```
 
 2. A DAG será sincronizada automaticamente com o container do Airflow em até 30 segundos.
@@ -176,4 +176,5 @@ Para destruir toda a infraestrutura quando não for mais necessária:
 cd terraform
 terraform destroy -var-file="terraform.tfvars"
 ```
+
 

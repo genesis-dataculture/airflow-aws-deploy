@@ -69,7 +69,7 @@ dbt clean
 ### Variáveis de Ambiente Necessárias
 
 - `DBT_ATHENA_S3_STAGING`: Bucket S3 para resultados intermediários do Athena
-  - Exemplo: `airflow-dev-test-install`
+  - Exemplo: `ons-dev-dg-00-stage`
 - `AWS_DEFAULT_REGION`: Região AWS (padrão: `us-east-1`)
 
 ### Pré-requisitos AWS

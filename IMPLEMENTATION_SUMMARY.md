@@ -63,12 +63,12 @@ aws glue create-database --database-input '{"Name":"raw_data","Description":"Raw
 
 #### b) Criar Estrutura S3
 ```powershell
-aws s3 sync ./dbt/ s3://airflow-dev-test-install/dbt/ --exclude "target/*" --exclude "dbt_packages/*"
+aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "target/*" --exclude "dbt_packages/*"
 ```
 
 #### c) Upload DAG
 ```powershell
-aws s3 cp ./dags/dbt_athena_example.py s3://airflow-dev-test-install/dags/
+aws s3 cp ./dags/dbt_athena_example.py s3://ons-dev-dg-00-stage/dags/
 ```
 
 ### 4. Atualizar Terraform
@@ -82,7 +82,7 @@ environment = [
   # dbt + Athena
   { name = "DBT_PROFILES_DIR", value = "/opt/airflow/dbt" },
   { name = "DBT_PROJECT_DIR", value = "/opt/airflow/dbt" },
-  { name = "DBT_ATHENA_S3_STAGING", value = "airflow-dev-test-install" }
+  { name = "DBT_ATHENA_S3_STAGING", value = "ons-dev-dg-00-stage" }
 ]
 ```
 
@@ -150,7 +150,7 @@ docker build -t airflow-dbt:latest .
 
 ## ⚠️ Atenção
 
-- Substitua `airflow-dev-test-install` pelo seu bucket S3 real
+- Substitua `ons-dev-dg-00-stage` pelo seu bucket S3 real
 - Configure IAM Role com permissões adequadas
 - Crie databases no Glue Catalog antes de executar
 - Os modelos de exemplo são apenas demonstrativos
@@ -167,3 +167,4 @@ docker build -t airflow-dbt:latest .
 **Branch**: `feature/dbt-athena-integration`  
 **Status**: ✅ Implementação Completa  
 **Próximo**: Configurar AWS e fazer deploy
+

@@ -35,7 +35,7 @@ def sync_dbt_project_from_s3():
     """
     import subprocess
     
-    s3_bucket = 'airflow-dev-test-install'
+    s3_bucket = 'ons-dev-dg-00-stage'
     s3_prefix = 'dbt/'
     local_path = '/opt/airflow/dbt/'
     
@@ -209,7 +209,7 @@ with DAG(
         bash_command='''
             cd /opt/airflow/dbt && \
             dbt docs generate --profiles-dir . --target dev && \
-            aws s3 sync target/ s3://airflow-dev-test-install/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
+            aws s3 sync target/ s3://ons-dev-dg-00-stage/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
         ''',
         doc_md="""
         ### Generate dbt Documentation
@@ -239,7 +239,7 @@ Este DAG demonstra a integração completa entre dbt e Athena orquestrado pelo A
 
 ## 🎯 Pré-requisitos
 - dbt-core e dbt-athena-community instalados
-- Projeto dbt no S3: `s3://airflow-dev-test-install/dbt/`
+- Projeto dbt no S3: `s3://ons-dev-dg-00-stage/dbt/`
 - AWS Glue Catalog configurado com databases e tables
 - IAM Role com permissões: Athena, Glue, S3
 
