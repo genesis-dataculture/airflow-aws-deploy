@@ -1,0 +1,24 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: athena
+      s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'airflow-dev-test-install') }}/athena-results/dev/"
+      region_name: us-east-1
+      database: analytics_dev
+      schema: dbt_dev
+      work_group: primary
+      threads: 4
+      aws_profile_name: null
+      
+    prod:
+      type: athena
+      s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'airflow-dev-test-install') }}/athena-results/prod/"
+      region_name: us-east-1
+      database: analytics_prod
+      schema: dbt_prod
+      work_group: primary
+      threads: 8
+      aws_profile_name: null
+      poll_interval: 1.0
+      num_retries: 3

@@ -38,6 +38,32 @@ else
     fi
 fi
 
+# Sincronizar projeto dbt do S3
+echo "[LOG] Sincronizando projeto dbt do S3..."
+mkdir -p /opt/airflow/dbt
+
+if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
+    echo "[LOG] Testando acesso ao dbt no S3: aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/"
+    if aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/ 2>/dev/null; then
+        echo "[LOG] Sincronizando projeto dbt: aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/"
+        if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/; then
+            echo "[SUCCESS] Projeto dbt sincronizado com sucesso!"
+            
+            # Instalar dependências dbt se packages.yml existir
+            if [ -f "/opt/airflow/dbt/packages.yml" ]; then
+                echo "[LOG] Instalando dependências dbt..."
+                cd /opt/airflow/dbt && dbt deps --profiles-dir . || echo "AVISO: Falha ao instalar dependências dbt"
+            fi
+        else
+            echo "AVISO: Falha ao sincronizar projeto dbt do S3"
+        fi
+    else
+        echo "INFO: Diretório dbt/ não encontrado no S3. Pulando sincronização dbt."
+    fi
+else
+    echo "AVISO: AIRFLOW_S3_BUCKET não definido. Pulando sincronização dbt."
+fi
+
 # Initialize Airflow database if this is the webserver
 if [ "$1" = "webserver" ]; then
     echo "Inicializando banco de dados do Airflow..."

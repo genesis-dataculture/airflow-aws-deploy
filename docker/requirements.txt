@@ -5,3 +5,9 @@ apache-airflow-providers-amazon>=8.0.0
 psycopg2-binary>=2.9.0
 pendulum>=2.1.0,<3.0.0
 pyodbc>=5.1.0,<6.0.0
+
+# dbt + Athena integration
+apache-airflow-providers-dbt-cloud>=3.5.0
+dbt-core>=1.7.0
+dbt-athena-community>=1.7.0
+PyAthena[SQLAlchemy]>=3.0.0

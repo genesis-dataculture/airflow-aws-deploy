@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Dados brutos do Data Lake no S3"
+    database: raw_data
+    schema: raw
+    tables:
+      - name: example_table
+        description: "Tabela de exemplo para demonstração"
+        external_location: "s3://airflow-dev-test-install/raw-data/example/"
+        columns:
+          - name: id
+            description: "ID único do registro"
+            tests:
+              - unique
+              - not_null
+          - name: created_at
+            description: "Data de criação do registro"
+            tests:
+              - not_null
+          - name: value
+            description: "Valor do registro"

@@ -1,0 +1,33 @@
+# Schema para modelos de staging
+# Este arquivo define a documentação e testes para os modelos staging
+
+version: 2
+
+models:
+  - name: stg_example
+    description: "Modelo de exemplo da camada staging"
+    columns:
+      - name: id
+        description: "ID único do registro"
+        tests:
+          - unique
+          - not_null
+      
+      - name: value
+        description: "Valor de exemplo"
+        tests:
+          - not_null
+      
+      - name: created_at
+        description: "Data de criação do registro"
+        tests:
+          - not_null
+      
+      - name: year
+        description: "Ano extraído de created_at para particionamento"
+      
+      - name: month
+        description: "Mês extraído de created_at para particionamento"
+      
+      - name: loaded_at
+        description: "Timestamp de quando o dado foi carregado no modelo"
