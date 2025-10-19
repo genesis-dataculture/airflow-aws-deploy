@@ -2,7 +2,7 @@
 
 Este documento descreve como fazer o deploy do projeto dbt para o ambiente AWS.
 
-## 📦 Estrutura no S3
+## Estrutura no S3
 
 O projeto dbt deve ser armazenado no S3 na seguinte estrutura:
 
@@ -29,7 +29,7 @@ s3://ons-dev-dg-00-stage/
     └── seeds/
 ```
 
-## 🚀 Deploy Inicial
+## Deploy Inicial
 
 ### 1. Upload do Projeto dbt para S3
 
@@ -37,7 +37,6 @@ Execute os seguintes comandos no PowerShell para fazer upload do projeto:
 
 ```powershell
 # Navegar para o diretório do projeto
-cd C:\Users\fabio\Desktop\Genesis\airflow-docker-i
 
 # Upload do projeto dbt para S3
 aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "target/*" --exclude "dbt_packages/*" --exclude "logs/*"
@@ -56,11 +55,69 @@ aws s3 cp ./dags/dbt_athena_example.py s3://ons-dev-dg-00-stage/dags/dbt_athena_
 aws s3 ls s3://ons-dev-dg-00-stage/dags/
 ```
 
-## 🔧 Configuração AWS Necessária
+## Configuracao AWS Necessaria
 
 ### 1. AWS Glue Catalog
 
 Antes de executar o dbt, você precisa criar databases no Glue Catalog:
+
+**Metodo 1: Script Automatizado (RECOMENDADO)**
+
+Execute o script PowerShell incluído no projeto:
+
+```powershell
+# Executar script de setup
+.\setup-glue-databases.ps1
+```
+
+O script cria automaticamente os três databases necessários e limpa os arquivos temporários.
+
+**Metodo 2: Comandos Manuais com Arquivos JSON (PowerShell - MAIS CONFIAVEL)**
+
+Devido a limitações do PowerShell com caracteres especiais em JSON inline, o método mais confiável é usar arquivos JSON:
+
+```powershell
+# Criar arquivos JSON
+@"
+{
+    "DatabaseInput": {
+        "Name": "analytics_dev",
+        "Description": "Database para ambiente de desenvolvimento - transformacoes dbt"
+    }
+}
+"@ | Out-File -FilePath analytics_dev.json -Encoding UTF8
+
+@"
+{
+    "DatabaseInput": {
+        "Name": "analytics_prod",
+        "Description": "Database para ambiente de producao - transformacoes dbt"
+    }
+}
+"@ | Out-File -FilePath analytics_prod.json -Encoding UTF8
+
+@"
+{
+    "DatabaseInput": {
+        "Name": "raw_data",
+        "Description": "Database para dados brutos (raw/landing)"
+    }
+}
+"@ | Out-File -FilePath raw_data.json -Encoding UTF8
+
+# Criar databases usando os arquivos
+aws glue create-database --cli-input-json file://analytics_dev.json
+aws glue create-database --cli-input-json file://analytics_prod.json
+aws glue create-database --cli-input-json file://raw_data.json
+
+# Limpar arquivos temporarios
+Remove-Item analytics_dev.json, analytics_prod.json, raw_data.json
+
+# Verificar databases criados
+aws glue get-databases --output json | ConvertFrom-Json | Select-Object -ExpandProperty DatabaseList | Where-Object {$_.Name -like 'analytics*' -or $_.Name -eq 'raw_data'} | Format-Table Name, Description
+```
+
+**Metodo 3: Bash/Linux/Mac**
 
 ```bash
 # Criar database para ambiente dev
@@ -74,6 +131,13 @@ aws glue create-database --database-input '{"Name":"raw_data","Description":"Dat
 
 # Listar databases
 aws glue get-databases
+```
+
+**Verificar se databases foram criados:**
+
+```powershell
+# Metodo visual com PowerShell
+aws glue get-databases --output json | ConvertFrom-Json | Select-Object -ExpandProperty DatabaseList | Where-Object {$_.Name -like 'analytics*' -or $_.Name -eq 'raw_data'} | Format-Table Name, Description, CreateTime
 ```
 
 ### 2. AWS Athena Workgroup
@@ -103,9 +167,9 @@ aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/prod/
 aws s3api put-object --bucket ons-dev-dg-00-stage --key raw-data/example/
 ```
 
-## 🔐 Permissões IAM Necessárias
+## Permissoes IAM Necessarias
 
-A IAM Role do ECS Task precisa das seguintes permissões:
+A IAM Role do ECS Task precisa das seguintes permissoes:
 
 ```json
 {
@@ -157,9 +221,9 @@ A IAM Role do ECS Task precisa das seguintes permissões:
 }
 ```
 
-## 🐳 Rebuild do Container Docker
+## Rebuild do Container Docker
 
-Após atualizar o requirements.txt, você precisa rebuildar a imagem Docker:
+Apos atualizar o requirements.txt, voce precisa rebuildar a imagem Docker:
 
 ```powershell
 # Navegar para o diretório docker
@@ -178,9 +242,9 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS --pa
 docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/airflow:dbt-athena
 ```
 
-## 📋 Variáveis de Ambiente no Terraform
+## Variaveis de Ambiente no Terraform
 
-Adicione as seguintes variáveis ao `terraform/modules/ecs/main.tf`:
+Adicione as seguintes variaveis ao `terraform/modules/ecs/main.tf`:
 
 ```terraform
 environment = [
@@ -194,7 +258,7 @@ environment = [
 ]
 ```
 
-## ✅ Checklist de Deploy
+## Checklist de Deploy
 
 - [ ] Projeto dbt criado localmente
 - [ ] Upload do projeto dbt para S3
@@ -209,9 +273,9 @@ environment = [
 - [ ] Terraform apply executado
 - [ ] ECS Task reiniciado
 
-## 🧪 Teste do Deploy
+## Teste do Deploy
 
-Após o deploy, teste a integração:
+Apos o deploy, teste a integracao:
 
 1. Acesse a UI do Airflow
 2. Verifique se a DAG `dbt_athena_example` aparece
@@ -230,19 +294,19 @@ aws athena start-query-execution \
     --result-configuration "OutputLocation=s3://ons-dev-dg-00-stage/athena-results/test/"
 ```
 
-## 🔄 Updates Futuros
+## Updates Futuros
 
-Para atualizar o projeto dbt após mudanças:
+Para atualizar o projeto dbt apos mudancas:
 
 ```powershell
 # Upload apenas dos arquivos modificados
 aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "target/*" --exclude "dbt_packages/*"
 
-# O entrypoint.sh irá sincronizar automaticamente no container
-# Ou force a re-execução da DAG
+# O entrypoint.sh ira sincronizar automaticamente no container
+# Ou force a re-execucao da DAG
 ```
 
-## 📞 Troubleshooting
+## Troubleshooting
 
 ### Erro: "Database does not exist"
 - Verifique se os databases foram criados no Glue Catalog
