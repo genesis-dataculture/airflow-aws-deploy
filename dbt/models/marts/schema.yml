@@ -1,0 +1,97 @@
+# Schema para modelos de marts (camada final analítica)
+# Este arquivo define a documentação e testes avançados para os modelos marts
+
+version: 2
+
+models:
+  - name: fct_example_summary
+    description: "Tabela de fatos com resumo agregado mensal dos dados de exemplo"
+    columns:
+      - name: summary_key
+        description: "Chave sintética gerada a partir de year e month"
+        tests:
+          - unique
+          - not_null
+      
+      - name: year
+        description: "Ano da agregação"
+        tests:
+          - not_null
+          # Teste avançado: ano deve estar em um range válido
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 2020
+              max_value: 2030
+              severity: error
+      
+      - name: month
+        description: "Mês da agregação"
+        tests:
+          - not_null
+          # Teste avançado: mês deve estar entre 1 e 12
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+              severity: error
+      
+      - name: total_records
+        description: "Total de registros no período"
+        tests:
+          - not_null
+          # Teste avançado: deve ter pelo menos 1 registro
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              severity: error
+          # Teste avançado: média deve ser razoável
+          - dbt_expectations.expect_column_mean_to_be_between:
+              min_value: 0
+              max_value: 100000
+              severity: warn
+      
+      - name: unique_ids
+        description: "Quantidade de IDs únicos no período"
+        tests:
+          - not_null
+          # Teste avançado: unique_ids não pode ser maior que total_records
+          - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
+              column_A: total_records
+              column_B: unique_ids
+              or_equal: true
+              severity: error
+      
+      - name: first_record_date
+        description: "Data do primeiro registro no período"
+        tests:
+          - not_null
+          # Teste avançado: data deve ser razoável
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "cast('2020-01-01' as date)"
+              max_value: "current_date"
+              severity: warn
+      
+      - name: last_record_date
+        description: "Data do último registro no período"
+        tests:
+          - not_null
+          # Teste avançado: last_record_date >= first_record_date
+          - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
+              column_A: last_record_date
+              column_B: first_record_date
+              or_equal: true
+              severity: error
+      
+      - name: aggregated_at
+        description: "Timestamp de quando a agregação foi executada"
+        tests:
+          - not_null
+          # Teste avançado: timestamp deve ser recente
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "current_timestamp - interval '7' day"
+              max_value: "current_timestamp + interval '1' hour"
+              severity: warn
+
+    # Teste no nível do modelo (row count)
+    tests:
+      # Teste avançado: tabela não pode estar vazia
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+          max_value: 100000
+          severity: error

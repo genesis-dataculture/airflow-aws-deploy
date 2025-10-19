@@ -25,12 +25,18 @@ with source_data as (
 
 cleaned as (
     select
+        -- Gerar chave sintética usando dbt_utils
+        {{ dbt_utils.generate_surrogate_key(['id', 'created_at']) }} as example_key,
+        
         id,
         value,
         created_at,
         year(created_at) as year,
         month(created_at) as month,
-        current_timestamp as loaded_at
+        
+        -- Usar dbt_utils para timestamp atual
+        {{ dbt_utils.current_timestamp() }} as loaded_at
+        
     from source_data
     where created_at is not null
 )

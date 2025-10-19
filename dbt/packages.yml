@@ -1,24 +1,26 @@
 # Packages dbt (dependências externas)
-# Descomente os packages que deseja usar
+# Configuração recomendada para produção robusta
 
 packages:
-  # dbt-utils: Funções utilitárias para dbt
-  # - package: dbt-labs/dbt_utils
-  #   version: 1.1.1
+  # dbt-utils: Funções utilitárias essenciais para transformações
+  # Macros para surrogate keys, pivot, union, star, etc.
+  - package: dbt-labs/dbt_utils
+    version: 1.1.1
   
-  # Codegen: Geração automática de código dbt
-  # - package: dbt-labs/codegen
-  #   version: 0.12.1
-  
-  # Audit helper: Testes de regressão
-  # - package: dbt-labs/audit_helper
-  #   version: 0.9.0
-  
-  # dbt-expectations: Testes avançados de qualidade
-  # - package: calogica/dbt_expectations
-  #   version: 0.10.1
+  # dbt-expectations: Testes avançados de qualidade de dados
+  # Validações estatísticas e regras de negócio complexas
+  - package: calogica/dbt_expectations
+    version: 0.10.1
 
-# Para instalar os packages:
-# 1. Descomente os packages desejados
-# 2. Execute: dbt deps
-# 3. Os packages serão instalados em dbt_packages/
+# Packages opcionais (descomente se necessário):
+#
+# Codegen: Geração automática de código dbt (útil na fase inicial)
+# - package: dbt-labs/codegen
+#   version: 0.12.1
+#
+# Audit helper: Testes de regressão (útil para refatorações)
+# - package: dbt-labs/audit_helper
+#   version: 0.9.0
+
+# Os packages serão instalados automaticamente em dbt_packages/
+# pela task dbt_setup ou pelo comando: dbt deps --profiles-dir .

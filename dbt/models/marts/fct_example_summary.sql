@@ -21,13 +21,19 @@ with staging_data as (
 
 aggregated as (
     select
+        -- Gerar chave sintética para o agregado usando dbt_utils
+        {{ dbt_utils.generate_surrogate_key(['year', 'month']) }} as summary_key,
+        
         year,
         month,
         count(*) as total_records,
         count(distinct id) as unique_ids,
         min(created_at) as first_record_date,
         max(created_at) as last_record_date,
-        current_timestamp as aggregated_at
+        
+        -- Usar dbt_utils para timestamp atual
+        {{ dbt_utils.current_timestamp() }} as aggregated_at
+        
     from staging_data
     group by year, month
 )

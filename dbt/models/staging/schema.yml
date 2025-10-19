@@ -5,29 +5,60 @@ version: 2
 
 models:
   - name: stg_example
-    description: "Modelo de exemplo da camada staging"
+    description: "Modelo de exemplo da camada staging com testes avançados"
     columns:
+      - name: example_key
+        description: "Chave sintética gerada a partir de id e created_at"
+        tests:
+          - unique
+          - not_null
+      
       - name: id
         description: "ID único do registro"
         tests:
           - unique
           - not_null
+          # Teste avançado: ID deve ser positivo
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 999999999
+              severity: error
       
       - name: value
         description: "Valor de exemplo"
         tests:
           - not_null
+          # Teste avançado: valor não pode ser vazio
+          - dbt_expectations.expect_column_values_to_not_be_null
       
       - name: created_at
         description: "Data de criação do registro"
         tests:
           - not_null
+          # Teste avançado: data deve ser razoável (não no futuro, não muito antiga)
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "cast('2020-01-01' as date)"
+              max_value: "current_date + interval '1' day"
+              severity: warn
       
       - name: year
         description: "Ano extraído de created_at para particionamento"
+        tests:
+          # Teste avançado: ano deve estar em um range válido
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 2020
+              max_value: 2030
+              severity: warn
       
       - name: month
         description: "Mês extraído de created_at para particionamento"
+        tests:
+          # Teste avançado: mês deve estar entre 1 e 12
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+              severity: error
       
       - name: loaded_at
         description: "Timestamp de quando o dado foi carregado no modelo"
+        tests:
+          - not_null
