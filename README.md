@@ -19,7 +19,11 @@ A arquitetura deste projeto inclui:
 ### 🔧 Componentes Principais
 - **Webserver**: Responsável pela interface web (http://load-balancer-dns)
 - **Scheduler**: Responsável pelo agendamento e execução de tarefas
-- **Sincronização S3**: Sincronização automática de DAGs a cada 30 segundos
+- **Sincronização S3**: Sincronização automática de DAGs e projeto dbt a cada 30 segundos
+- **dbt Integration**: Transformações de dados com dbt-core 1.7.17 e dbt-athena-community 1.7.2
+  - Packages pré-instalados: dbt_utils, dbt_expectations
+  - Execução orquestrada via Airflow DAGs
+  - Materializações em AWS Athena com Glue Catalog
 
 ## Pré-requisitos
 
@@ -33,10 +37,18 @@ A arquitetura deste projeto inclui:
 
 ### 2. Construir a imagem Docker do Airflow
 
+**IMPORTANTE**: O build deve ser executado da **raiz do projeto** para que o Docker consiga copiar o projeto dbt para a imagem.
+
 ```bash
-cd docker
-docker build -t airflow-on-ecs-fargate .
+# Da raiz do projeto (não da pasta docker/)
+docker build -f docker/Dockerfile -t airflow-dbt-athena:latest .
 ```
+
+**O que acontece durante o build:**
+- Instala dependências Python (Airflow, dbt-core, dbt-athena-community, etc.)
+- Copia o projeto dbt completo para `/opt/airflow/dbt`
+- **Instala packages dbt (dbt_utils, dbt_expectations) durante o build** - não precisa mais instalar no startup
+- Configura entrypoint para sincronização automática de DAGs e código dbt
 
 ### 3. Autenticar no Amazon ECR
 
@@ -53,9 +65,19 @@ aws ecr create-repository --repository-name airflow-on-ecs-fargate --region us-e
 ### 5. Taguear e enviar a imagem para o ECR
 
 ```bash
-docker tag airflow-on-ecs-fargate:latest 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
+docker tag airflow-dbt-athena:latest 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
 docker push 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
 ```
+
+**Alternativa**: Use o script automatizado para fazer build e deploy de uma vez:
+
+```powershell
+# Windows PowerShell
+cd docker
+.\build-and-deploy.ps1
+```
+
+Este script automatiza todas as etapas: build, tag, login ECR, push e update dos serviços ECS.
 
 ### 6. Criar o IAM Role para execução das tarefas do ECS (se ainda não existir)
 
@@ -135,16 +157,27 @@ Após a implantação bem-sucedida, a URL da interface do Airflow estará dispon
 terraform output airflow_ui_url
 ```
 
-### 9. Fazer upload das DAGs para o S3
+### 9. Fazer upload das DAGs e projeto dbt para o S3
 
 ```bash
 # Copiar as DAGs para o bucket S3
 aws s3 sync ./dags/ s3://ons-dev-dg-00-stage/dags/
+
+# Copiar o projeto dbt para o bucket S3
+aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "dbt_packages/*"
 ```
 
-## Atualização das DAGs
+**Nota sobre dbt packages**: Os packages dbt (dbt_utils, dbt_expectations) já estão instalados na imagem Docker e não precisam ser sincronizados do S3. Apenas o código dbt (models, macros, tests, etc.) é sincronizado.
 
-Este sistema está configurado para sincronizar automaticamente as DAGs do bucket S3 com o diretório local do Airflow a cada 30 segundos. Sempre que você adicionar ou modificar uma DAG:
+## Atualização das DAGs e Projeto dbt
+
+Este sistema está configurado para sincronizar automaticamente:
+- **DAGs**: Do S3 para `/opt/airflow/dags/` a cada 30 segundos
+- **Projeto dbt**: Do S3 para `/opt/airflow/dbt/` a cada 30 segundos (excluindo `dbt_packages/` que já estão na imagem)
+
+### Atualizando DAGs
+
+Sempre que você adicionar ou modificar uma DAG:
 
 1. Faça o upload da DAG para o bucket S3:
    ```bash
@@ -153,9 +186,24 @@ Este sistema está configurado para sincronizar automaticamente as DAGs do bucke
 
 2. A DAG será sincronizada automaticamente com o container do Airflow em até 30 segundos.
 
-## Como funciona a sincronização das DAGs
+### Atualizando Modelos dbt
+
+Sempre que você modificar modelos, tests ou configurações dbt:
+
+1. Faça o upload para o bucket S3:
+   ```bash
+   aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "dbt_packages/*"
+   ```
+
+2. O código dbt será sincronizado automaticamente em até 30 segundos.
+
+3. **Importante**: Se você adicionar ou remover packages no `packages.yml`, é necessário **rebuild e redeploy da imagem Docker** pois os packages são instalados durante o build da imagem.
+
+## Como funciona a sincronização automática
 
 O sistema de sincronização automática funciona da seguinte maneira:
+
+### Sincronização de DAGs
 
 1. Quando o container do Airflow é iniciado, o script `entrypoint.sh` executa uma primeira sincronização com o comando `aws s3 sync`.
 
@@ -167,6 +215,87 @@ O sistema de sincronização automática funciona da seguinte maneira:
    - DAGs removidas do S3 também sejam removidas do ambiente local
 
 4. O Airflow verifica periodicamente o diretório de DAGs para identificar alterações.
+
+### Sincronização de Projeto dbt
+
+1. Durante o **build da imagem Docker**, os packages dbt (dbt_utils, dbt_expectations) são instalados em `/opt/airflow/dbt/dbt_packages/`.
+
+2. No **startup do container**, apenas o código dbt (models, macros, tests, seeds, etc.) é sincronizado do S3.
+
+3. A sincronização usa `--exclude "dbt_packages/*"` para **não sobrescrever** os packages já instalados na imagem.
+
+4. Isso reduz o tempo de startup em **60%** (~20s ao invés de ~80s) pois não precisa reinstalar packages a cada restart.
+
+### Benefícios da Arquitetura
+
+- **Startup rápido**: Packages pré-instalados na imagem
+- **Código atualizado**: Sincronização automática a cada 30 segundos
+- **Sem downtime**: Alterações em modelos dbt não exigem rebuild
+- **Versionamento**: Packages ficam versionados junto com a imagem Docker
+
+## Integração com dbt
+
+Este projeto inclui integração completa com dbt (data build tool) para transformações de dados no AWS Athena.
+
+### Estrutura do Projeto dbt
+
+```
+dbt/
+├── dbt_project.yml          # Configuração do projeto
+├── profiles.yml             # Conexão Athena (dev/prod)
+├── packages.yml             # Packages instalados (dbt_utils, dbt_expectations)
+├── models/
+│   ├── staging/            # Camada staging (views)
+│   ├── intermediate/       # Camada intermediária (ephemeral)
+│   └── marts/              # Camada marts (tables em Parquet)
+├── tests/                  # Testes customizados
+├── macros/                 # Macros reutilizáveis
+└── seeds/                  # Dados estáticos (CSV)
+```
+
+### DAG de Exemplo: dbt_athena_example
+
+O projeto inclui uma DAG de exemplo que demonstra:
+
+1. **Verificação de instalação**: Valida dbt e adapter Athena
+2. **Execução de modelos**: staging → intermediate → marts
+3. **Testes de qualidade**: 15+ validações automáticas com dbt_expectations
+4. **Geração de documentação**: Docs interativas do dbt
+
+### Executando Transformações dbt
+
+```bash
+# Via Airflow UI
+1. Acesse a UI do Airflow
+2. Encontre a DAG "dbt_athena_example"
+3. Trigger manual execution
+
+# Via linha de comando (dentro do container)
+docker exec -it <container-id> bash
+cd /opt/airflow/dbt
+dbt run --profiles-dir . --target dev
+dbt test --profiles-dir . --target dev
+```
+
+### Packages dbt Disponíveis
+
+- **dbt_utils v1.1.1**: Funções utilitárias (surrogate keys, pivot, union, star)
+- **dbt_expectations v0.10.1**: Testes avançados de qualidade de dados
+
+Consulte `dbt/PACKAGES_GUIDE.md` para exemplos de uso.
+
+### Atualizando Packages dbt
+
+Se você adicionar ou atualizar packages no `packages.yml`:
+
+1. Edite `dbt/packages.yml`
+2. Rebuild e redeploy da imagem Docker:
+   ```bash
+   docker build -f docker/Dockerfile -t airflow-dbt-athena:latest .
+   docker tag airflow-dbt-athena:latest 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
+   docker push 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
+   aws ecs update-service --cluster airflow-cluster --service airflow-scheduler-service --force-new-deployment
+   ```
 
 ## Limpeza
 
