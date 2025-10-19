@@ -142,29 +142,76 @@ aws glue get-databases --output json | ConvertFrom-Json | Select-Object -ExpandP
 
 ### 2. AWS Athena Workgroup
 
-Verificar se o workgroup 'primary' existe:
+O workgroup 'primary' já existe por padrão no Athena, mas precisa ser configurado com o OutputLocation correto.
 
-```bash
+**Verificar configuração atual:**
+
+```powershell
 # Listar workgroups
 aws athena list-work-groups
 
-# Criar workgroup se necessário
-aws athena create-work-group \
-    --name primary \
-    --configuration "ResultConfigurationUpdates={OutputLocation=s3://ons-dev-dg-00-stage/athena-results/}"
+# Verificar configuração do workgroup 'primary'
+aws athena get-work-group --work-group primary --output json | ConvertFrom-Json | Select-Object -ExpandProperty WorkGroup | Select-Object Name, State, @{Name='OutputLocation';Expression={$_.Configuration.ResultConfiguration.OutputLocation}}
 ```
+
+**Atualizar workgroup 'primary' (PowerShell - RECOMENDADO):**
+
+```powershell
+# Atualizar OutputLocation do workgroup primary
+aws athena update-work-group --work-group primary --configuration-updates "ResultConfigurationUpdates={OutputLocation=s3://ons-dev-dg-00-stage/athena-results/}"
+
+# Verificar atualização
+aws athena get-work-group --work-group primary --output json | ConvertFrom-Json | Select-Object -ExpandProperty WorkGroup | Select-Object Name, State, @{Name='OutputLocation';Expression={$_.Configuration.ResultConfiguration.OutputLocation}}
+```
+
+**Alternativa Bash/Linux/Mac:**
+
+```bash
+# Atualizar workgroup
+aws athena update-work-group \
+    --work-group primary \
+    --configuration-updates "ResultConfigurationUpdates={OutputLocation=s3://ons-dev-dg-00-stage/athena-results/}"
+
+# Verificar
+aws athena get-work-group --work-group primary
+```
+
+**NOTA:** O workgroup 'primary' já existe por padrão e NÃO pode ser criado novamente. Se precisar criar um workgroup customizado, use um nome diferente.
 
 ### 3. Estrutura de Buckets S3
 
+**PowerShell:**
+
+```powershell
+# Criar estrutura de pastas no S3 para dbt
+aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/staging/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/marts/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/seeds/
+
+# Criar estrutura para resultados do Athena
+aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/dev/
+aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/prod/
+
+# Criar estrutura para dados brutos
+aws s3api put-object --bucket ons-dev-dg-00-stage --key raw-data/example/
+
+# Verificar estrutura criada
+aws s3 ls s3://ons-dev-dg-00-stage/ --recursive | Select-String -Pattern "dbt-data|athena-results|raw-data"
+```
+
+**Bash/Linux/Mac:**
+
 ```bash
 # Criar estrutura de pastas no S3
-aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt/
 aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/staging/
 aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/marts/
 aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/seeds/
 aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/dev/
 aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/prod/
 aws s3api put-object --bucket ons-dev-dg-00-stage --key raw-data/example/
+
+# Verificar
+aws s3 ls s3://ons-dev-dg-00-stage/ --recursive
 ```
 
 ## Permissoes IAM Necessarias
@@ -227,7 +274,7 @@ Apos atualizar o requirements.txt, voce precisa rebuildar a imagem Docker:
 
 ```powershell
 # Navegar para o diretório docker
-cd C:\Users\fabio\Desktop\Genesis\airflow-docker-i\docker
+cd .\docker
 
 # Build da imagem
 docker build -t airflow-dbt-athena:latest .
