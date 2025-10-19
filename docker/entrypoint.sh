@@ -45,7 +45,7 @@ mkdir -p /opt/airflow/dbt
 if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
     echo "[LOG] Testando acesso ao dbt no S3: aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/"
     if aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/ 2>/dev/null; then
-        echo "[LOG] Sincronizando projeto dbt: aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/"
+        echo "[LOG] Sincronizando projeto dbt (inicial): aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/"
         if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/; then
             echo "[SUCCESS] Projeto dbt sincronizado com sucesso!"
             
@@ -54,6 +54,25 @@ if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
                 echo "[LOG] Instalando dependências dbt..."
                 cd /opt/airflow/dbt && dbt deps --profiles-dir . || echo "AVISO: Falha ao instalar dependências dbt"
             fi
+            
+            # Configurar sincronização automática de projeto dbt
+            echo "[LOG] Configurando sincronização automática de projeto dbt (a cada 30 segundos)..."
+            (
+              while true; do
+                echo "[SYNC-DBT] Sincronizando projeto dbt do S3 (loop): aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --delete"
+                if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --delete 2>/dev/null; then
+                    echo "[SYNC-DBT] Projeto dbt sincronizado em $(date)"
+                    
+                    # Re-instalar dependências se packages.yml mudou
+                    if [ -f "/opt/airflow/dbt/packages.yml" ]; then
+                        cd /opt/airflow/dbt && dbt deps --profiles-dir . 2>/dev/null || true
+                    fi
+                else
+                    echo "[SYNC-DBT] AVISO: Falha na sincronização do projeto dbt em $(date)"
+                fi
+                sleep 30
+              done
+            ) &
         else
             echo "AVISO: Falha ao sincronizar projeto dbt do S3"
         fi

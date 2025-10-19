@@ -1,13 +1,15 @@
-apache-airflow[amazon,postgres,ssh]>=2.8.1
+# Apache Airflow - fixar na versão 2.8.1 para evitar conflitos com dbt
+apache-airflow[amazon,postgres,ssh]==2.8.1
 boto3>=1.26.0
 watchtower>=1.0.6
-apache-airflow-providers-amazon>=8.0.0
+apache-airflow-providers-amazon>=8.0.0,<9.0.0
 psycopg2-binary>=2.9.0
 pendulum>=2.1.0,<3.0.0
 pyodbc>=5.1.0,<6.0.0
 
 # dbt + Athena integration
-apache-airflow-providers-dbt-cloud>=3.5.0
-dbt-core>=1.7.0
-dbt-athena-community>=1.7.0
-PyAthena[SQLAlchemy]>=3.0.0
+# Fixar versões compatíveis para evitar conflitos de dependências
+apache-airflow-providers-dbt-cloud==3.5.1
+dbt-core==1.7.17
+dbt-athena-community==1.7.2
+PyAthena[SQLAlchemy]>=3.0.0,<4.0.0
