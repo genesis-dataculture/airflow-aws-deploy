@@ -26,41 +26,6 @@ default_args = {
 }
 
 
-def sync_dbt_project_from_s3():
-    """
-    Sincroniza o projeto dbt do S3 para o container
-    
-    Esta função garante que temos a versão mais atualizada do projeto dbt
-    antes de executar as transformações.
-    """
-    import subprocess
-    
-    s3_bucket = 'ons-dev-dg-00-stage'
-    s3_prefix = 'dbt/'
-    local_path = '/opt/airflow/dbt/'
-    
-    print(f"[INFO] Sincronizando projeto dbt de s3://{s3_bucket}/{s3_prefix} para {local_path}")
-    
-    result = subprocess.run(
-        [
-            'aws', 's3', 'sync',
-            f's3://{s3_bucket}/{s3_prefix}',
-            local_path,
-            '--delete'
-        ],
-        capture_output=True,
-        text=True
-    )
-    
-    print(result.stdout)
-    
-    if result.returncode != 0:
-        print(f"[ERROR] Falha ao sincronizar dbt do S3: {result.stderr}")
-        raise Exception(f"Erro na sincronização do S3: {result.stderr}")
-    
-    print("[SUCCESS] Projeto dbt sincronizado com sucesso!")
-
-
 def check_dbt_installation():
     """Verifica se o dbt está instalado corretamente"""
     import subprocess
@@ -96,51 +61,15 @@ with DAG(
         ### Check dbt Installation
         Verifica se o dbt-core e dbt-athena-community estão instalados corretamente
         no container.
-        """
-    )
-
-    # Task 2: Sincronizar projeto dbt do S3
-    sync_dbt = PythonOperator(
-        task_id='sync_dbt_project',
-        python_callable=sync_dbt_project_from_s3,
-        doc_md="""
-        ### Sync dbt Project from S3
-        Sincroniza o projeto dbt do S3 bucket para o container do Airflow.
-        Isso garante que sempre executamos a versão mais recente do código dbt.
-        """
-    )
-
-    # Task Group: Setup dbt
-    with TaskGroup('dbt_setup', tooltip='Setup e validação do projeto dbt') as setup_group:
         
-        dbt_deps = BashOperator(
-            task_id='install_dependencies',
-            bash_command='cd /opt/airflow/dbt && dbt deps --profiles-dir .',
-            doc_md="""
-            ### Install dbt Dependencies
-            Instala dependências do dbt definidas no packages.yml (se existir).
-            """
-        )
-
-        dbt_debug = BashOperator(
-            task_id='debug_connection',
-            bash_command='cd /opt/airflow/dbt && dbt debug --profiles-dir .',
-            doc_md="""
-            ### Debug dbt Connection
-            Valida a configuração de conexão com Athena e testa credenciais.
-            """
-        )
-
-        dbt_compile = BashOperator(
-            task_id='compile_models',
-            bash_command='cd /opt/airflow/dbt && dbt compile --profiles-dir . --target dev',
-            doc_md="""
-            ### Compile dbt Models
-            Compila os modelos dbt sem executá-los, validando a sintaxe SQL.
-            """
-        )
-
-        dbt_deps >> dbt_debug >> dbt_compile
+        **NOTA:** A sincronização do projeto dbt do S3 é feita automaticamente pelo
+        entrypoint.sh a cada 30 segundos em background, não sendo necessária uma task
+        dedicada para isso.
+        
+        O comando `dbt run` já valida a conexão e compila os modelos antes de executá-los,
+        tornando desnecessárias tasks separadas de setup, debug ou compile.
+        """
+    )
 
     # Task Group: Execução dos modelos dbt
     with TaskGroup('dbt_run_models', tooltip='Execução das transformações dbt') as run_group:
@@ -218,8 +147,10 @@ with DAG(
         """
     )
 
-    # Definir dependências entre os grupos
-    check_dbt >> sync_dbt >> setup_group >> run_group >> quality_group >> dbt_docs
+    # Definir dependências entre as tasks
+    # NOTA: sync_dbt e dbt_setup removidos - sincronização automática pelo entrypoint.sh
+    # e validação/compilação feitas automaticamente pelo dbt run
+    check_dbt >> run_group >> quality_group >> dbt_docs
 
 
 # Documentação adicional do DAG
@@ -231,17 +162,23 @@ Este DAG demonstra a integração completa entre dbt e Athena orquestrado pelo A
 
 ## 🔄 Fluxo de Execução
 1. **Check Installation**: Verifica se dbt está instalado
-2. **Sync Project**: Sincroniza código dbt do S3
-3. **Setup**: Instala dependências e valida conexões
-4. **Run Models**: Executa transformações (staging → intermediate → marts)
-5. **Quality Checks**: Executa testes de qualidade
-6. **Documentation**: Gera e publica documentação
+2. **Run Models**: Executa transformações (staging → intermediate → marts)
+3. **Quality Checks**: Executa testes de qualidade
+4. **Documentation**: Gera e publica documentação
+
+**NOTAS IMPORTANTES:**
+- A sincronização do projeto dbt do S3 é feita automaticamente pelo `entrypoint.sh` 
+  a cada 30 segundos em background. Isso garante que o código dbt está sempre 
+  atualizado sem necessidade de uma task dedicada na DAG.
+- O comando `dbt run` já valida conexões e compila modelos antes de executar, 
+  eliminando a necessidade de tasks separadas de setup, debug ou compile.
 
 ## 🎯 Pré-requisitos
 - dbt-core e dbt-athena-community instalados
 - Projeto dbt no S3: `s3://ons-dev-dg-00-stage/dbt/`
 - AWS Glue Catalog configurado com databases e tables
 - IAM Role com permissões: Athena, Glue, S3
+- Sincronização automática configurada no entrypoint.sh (a cada 30s)
 
 ## 🚀 Como Executar
 1. Acesse a UI do Airflow
