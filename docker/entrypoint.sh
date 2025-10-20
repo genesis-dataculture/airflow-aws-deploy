@@ -47,6 +47,7 @@ if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
     if aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/ 2>/dev/null; then
         echo "[LOG] Sincronizando projeto dbt (apenas código, excluindo packages)..."
         # IMPORTANTE: --exclude "dbt_packages/*" - não sobrescrever packages da imagem
+        # SEM --delete para preservar dbt_packages instalados durante o build
         if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --exclude "dbt_packages/*"; then
             echo "[SUCCESS] Projeto dbt sincronizado!"
             echo "[INFO] Packages dbt já instalados na imagem - nenhuma instalação necessária"
@@ -58,11 +59,11 @@ if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
             fi
             
             # Configurar sincronização automática de projeto dbt (a cada 30 segundos)
-            # SEMPRE excluindo dbt_packages
+            # SEMPRE excluindo dbt_packages - REMOVIDO --delete para não apagar packages da imagem
             echo "[LOG] Configurando sincronização automática de projeto dbt (a cada 30 segundos)..."
             (
               while true; do
-                if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --delete --exclude "dbt_packages/*" 2>/dev/null; then
+                if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --exclude "dbt_packages/*" 2>/dev/null; then
                     echo "[SYNC-DBT] Projeto dbt sincronizado em $(date)"
                 else
                     echo "[SYNC-DBT] AVISO: Falha na sincronização do projeto dbt em $(date)"

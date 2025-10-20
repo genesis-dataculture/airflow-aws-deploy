@@ -76,8 +76,24 @@ with DAG(
         
         dbt_run_staging = BashOperator(
             task_id='run_staging_models',
-            # Adicionar 2>&1 para capturar stderr e --debug para mais detalhes
-            bash_command='cd /opt/airflow/dbt && dbt run --profiles-dir . --target dev --select staging.* --debug 2>&1',
+            # Forçar captura de stderr e verbose logging
+            bash_command='''
+                cd /opt/airflow/dbt && \
+                echo "=== DBT Run Starting ===" && \
+                ls -la && \
+                echo "=== profiles.yml ===" && \
+                cat profiles.yml && \
+                echo "=== dbt version ===" && \
+                dbt --version && \
+                echo "=== dbt debug (capturing stderr) ===" && \
+                dbt debug --profiles-dir . --target dev 2>&1 || echo "dbt debug failed with code $?" && \
+                echo "=== Checking dbt_packages ===" && \
+                ls -la dbt_packages/ 2>&1 || echo "No dbt_packages dir" && \
+                echo "=== Checking AWS credentials ===" && \
+                aws sts get-caller-identity 2>&1 || echo "No AWS credentials" && \
+                echo "=== dbt run ===" && \
+                dbt run --profiles-dir . --target dev --select staging.* --debug 2>&1
+            ''',
             doc_md="""
             ### Run Staging Models
             Executa os modelos da camada staging (limpeza e padronização).
