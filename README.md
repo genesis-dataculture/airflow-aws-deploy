@@ -81,50 +81,58 @@ Este script automatiza todas as etapas: build, tag, login ECR, push e update dos
 
 ### 6. Criar o IAM Role para execução das tarefas do ECS (se ainda não existir)
 
-```bash
-# Criar a política que permite acesso ao S3
-cat > airflow-s3-access-policy.json << EOF
+**IMPORTANTE**: Esta role precisa de permissões para S3, Athena e Glue para executar transformações dbt.
+
+```powershell
+# 1. Criar arquivo de trust policy (permite ECS assumir a role)
+@"
 {
-  "Version": "2012-10-17",
-  "Statement": [
+  \"Version\": \"2012-10-17\",
+  \"Statement\": [
     {
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:ListBucket",
-        "s3:PutObject",
-        "s3:DeleteObject"
-      ],
-      "Resource": [
-        "arn:aws:s3:::ons-dev-dg-00-stage",
-        "arn:aws:s3:::ons-dev-dg-00-stage/*"
-      ]
+      \"Effect\": \"Allow\",
+      \"Principal\": {
+        \"Service\": \"ecs-tasks.amazonaws.com\"
+      },
+      \"Action\": \"sts:AssumeRole\"
     }
   ]
 }
-EOF
+"@ | Out-File -FilePath trust-policy.json -Encoding UTF8
 
-aws iam create-policy --policy-name AirflowS3AccessPolicy --policy-document file://airflow-s3-access-policy.json
+# 2. Criar a IAM Role
+aws iam create-role `
+  --role-name airflow-task-execution-role `
+  --assume-role-policy-document file://trust-policy.json
 
-# Criar a role
-aws iam create-role --role-name airflow-task-execution-role --assume-role-policy-document '{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "ecs-tasks.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}'
+# 3. Anexar política de execução ECS (para logs e ECR)
+aws iam attach-role-policy `
+  --role-name airflow-task-execution-role `
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
-# Anexar políticas à role
-aws iam attach-role-policy --role-name airflow-task-execution-role --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-aws iam attach-role-policy --role-name airflow-task-execution-role --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
-aws iam attach-role-policy --role-name airflow-task-execution-role --policy-arn arn:aws:iam::$(aws sts get-caller-identity --query 'Account' --output text):policy/AirflowS3AccessPolicy
+# 4. Criar e anexar política para dbt + Athena + Glue + S3
+# O arquivo iam-dbt-policy.json está incluído no repositório
+aws iam create-policy `
+  --policy-name AirflowDbtAthenaPolicy `
+  --policy-document file://iam-dbt-policy.json `
+  --description "Permissoes para dbt executar no Athena via Airflow"
+
+aws iam attach-role-policy `
+  --role-name airflow-task-execution-role `
+  --policy-arn arn:aws:iam::730335315247:policy/AirflowDbtAthenaPolicy
+
+# 5. Verificar políticas anexadas
+aws iam list-attached-role-policies --role-name airflow-task-execution-role
+
+# 6. Limpar arquivos temporários
+Remove-Item trust-policy.json
 ```
+
+**Permissões incluídas na política AirflowDbtAthenaPolicy:**
+- **Athena**: Executar queries, acessar workgroups e metadados
+- **Glue Catalog**: Criar/ler/atualizar tabelas e databases
+- **S3**: Acesso completo ao bucket `ons-dev-dg-00-stage` (DAGs, dbt, logs, resultados Athena)
+- **CloudWatch Logs**: Escrita de logs das tasks ECS
 
 ### 7. Implantar a infraestrutura com Terraform
 
