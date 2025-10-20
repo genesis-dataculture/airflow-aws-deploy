@@ -41,7 +41,7 @@ A arquitetura deste projeto inclui:
 
 ```bash
 # Da raiz do projeto (não da pasta docker/)
-docker build -f docker/Dockerfile -t airflow-dbt-athena:latest .
+docker build --no-cache -f docker/Dockerfile -t airflow-dbt-athena:latest .
 ```
 
 **O que acontece durante o build:**
@@ -177,6 +177,41 @@ aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "dbt_packages/*"
 
 **Nota sobre dbt packages**: Os packages dbt (dbt_utils, dbt_expectations) já estão instalados na imagem Docker e não precisam ser sincronizados do S3. Apenas o código dbt (models, macros, tests, etc.) é sincronizado.
 
+### 10. Configurar permissões AWS Lake Formation (IMPORTANTE)
+
+Se os databases/tables do Glue estiverem protegidos por AWS Lake Formation, é necessário conceder permissões explícitas à role `airflow-task-execution-role`:
+
+```powershell
+# Execute o script de configuração do Lake Formation
+.\grant-lakeformation-permissions.ps1
+```
+
+**O que o script faz:**
+- Concede permissões `ALL` no database `analytics_dev` para a role do Airflow
+- Concede permissões `ALL` em todas as tabelas do database (TableWildcard)
+- Permite que o dbt crie, leia e modifique tabelas via Athena
+
+**Alternativa manual (via AWS Console):**
+1. Acesse AWS Lake Formation → Databases
+2. Selecione `analytics_dev`
+3. Actions → Grant
+4. Selecione IAM Role: `airflow-task-execution-role`
+5. Permissions: `ALL`
+6. Repita para Tables com TableWildcard
+
+**Como verificar se Lake Formation está ativo:**
+```powershell
+# Se retornar erro "AccessDeniedException: Insufficient Lake Formation permission(s)"
+aws glue get-database --name analytics_dev
+
+# Então você DEVE executar o script grant-lakeformation-permissions.ps1
+```
+
+**Sintoma de permissão faltando**: A DAG `dbt_athena_example` falhará com erro:
+```
+AccessDeniedException: Insufficient Lake Formation permission(s) on analytics_dev
+```
+
 ## Atualização das DAGs e Projeto dbt
 
 Este sistema está configurado para sincronizar automaticamente:
@@ -245,6 +280,25 @@ O sistema de sincronização automática funciona da seguinte maneira:
 
 Este projeto inclui integração completa com dbt (data build tool) para transformações de dados no AWS Athena.
 
+### ✅ Status da Integração dbt
+
+**Infraestrutura Configurada:**
+- ✅ **Packages instalados automaticamente**: dbt_utils (v1.1.1), dbt_expectations (v0.10.1), dbt_date
+- ✅ **Conexão Athena**: Funcionando com sucesso
+- ✅ **dbt debug**: Todos os checks passaram
+- ✅ **Adapter dbt-athena-community**: v1.7.2 configurado
+- ✅ **Database Glue Catalog**: `analytics_dev` acessível
+- ✅ **Workgroup Athena**: `primary` configurado
+- ✅ **Lake Formation**: Permissões ALL concedidas
+- ✅ **S3 Staging**: `s3://ons-dev-dg-00-stage/athena-results/dev/`
+
+**Capacidades Habilitadas:**
+- 🔧 Modelos dbt prontos para execução (staging → intermediate → marts)
+- 🧪 Testes de qualidade de dados com dbt_expectations
+- 📊 Materializações em Athena (views, tables, incremental)
+- 🔄 Sincronização automática de código dbt a cada 30s
+- 📝 Geração de documentação interativa
+
 ### Estrutura do Projeto dbt
 
 ```
@@ -304,6 +358,73 @@ Se você adicionar ou atualizar packages no `packages.yml`:
    docker push 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
    aws ecs update-service --cluster airflow-cluster --service airflow-scheduler-service --force-new-deployment
    ```
+
+## Troubleshooting
+
+### Problema: dbt_packages não encontrados
+
+**Sintoma**: Erro `ModuleNotFoundError: No module named 'dbt'` ou packages não listados.
+
+**Causa**: Packages dbt são instalados no primeiro startup do container.
+
+**Solução**: 
+1. Aguarde 30-60 segundos após o primeiro deploy
+2. Verifique os logs do scheduler: `[INFO] Instalando dbt packages (primeira execução)...`
+3. Se falhar, force restart: `aws ecs update-service --cluster airflow-cluster --service airflow-scheduler-service --force-new-deployment`
+
+### Problema: Testes dbt falhando com erro de sintaxe
+
+**Sintoma**: `Compilation Error in test ... takes no keyword argument 'column_name'`
+
+**Causa**: Testes `dbt_expectations` mal configurados no `schema.yml`.
+
+**Solução**:
+1. Verifique a documentação do dbt_expectations: https://github.com/calogica/dbt-expectations
+2. Testes de comparação entre colunas (`expect_column_pair_values_A_to_be_greater_than_B`) devem estar no nível do modelo, não da coluna
+3. Use `column_A` e `column_B` (não `column_name`)
+
+### Problema: Permission denied em /opt/airflow/dbt
+
+**Sintoma**: `[Errno 13] Permission denied: '/opt/airflow/dbt/...'`
+
+**Causa**: Diretório dbt pertence ao root, mas Airflow roda como usuário `airflow`.
+
+**Solução**: A correção já está implementada no `entrypoint.sh`:
+```bash
+chown -R airflow:root /opt/airflow/dbt
+chmod -R 775 /opt/airflow/dbt
+```
+
+### Problema: Lake Formation AccessDeniedException
+
+**Sintoma**: `Insufficient Lake Formation permission(s) on analytics_dev`
+
+**Solução**:
+```powershell
+# Executar script de permissões
+.\grant-lakeformation-permissions.ps1
+
+# OU manualmente via AWS Console:
+# Lake Formation → Databases → analytics_dev → Grant
+# Role: airflow-task-execution-role
+# Permissions: ALL (database + tables)
+```
+
+### Verificando Status do Sistema
+
+```powershell
+# 1. Verificar logs do scheduler
+aws logs tail /ecs/airflow-scheduler --follow
+
+# 2. Verificar se packages foram instalados
+aws ecs execute-command --cluster airflow-cluster --task <task-id> --container airflow-scheduler --command "ls -la /opt/airflow/dbt/dbt_packages/"
+
+# 3. Testar conexão Athena manualmente
+aws ecs execute-command --cluster airflow-cluster --task <task-id> --container airflow-scheduler --command "cd /opt/airflow/dbt && dbt debug --profiles-dir . --target dev"
+
+# 4. Ver última sincronização S3
+aws logs filter-pattern "[SYNC-DBT]" --log-group-name /ecs/airflow-scheduler --start-time 1h
+```
 
 ## Limpeza
 

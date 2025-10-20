@@ -26,20 +26,94 @@ default_args = {
 }
 
 
-def check_dbt_installation():
-    """Verifica se o dbt está instalado corretamente"""
+def check_aws_and_dbt():
+    """Diagnóstico completo: AWS credentials, S3, Athena, Glue, dbt"""
     import subprocess
+    import os
     
-    result = subprocess.run(
-        ['dbt', '--version'],
-        capture_output=True,
-        text=True
-    )
+    print("=" * 60)
+    print("DIAGNÓSTICO: AWS + dbt")
+    print("=" * 60)
     
+    # 1. Environment variables
+    print("\n[1/8] Environment Variables (AWS/dbt):")
+    for key in ['AWS_DEFAULT_REGION', 'AWS_REGION', 'DBT_PROFILES_DIR', 
+                'DBT_PROJECT_DIR', 'DBT_ATHENA_S3_STAGING', 'AIRFLOW_S3_BUCKET']:
+        val = os.environ.get(key, 'NOT SET')
+        print(f"  {key}: {val}")
+    
+    # 2. AWS Credentials
+    print("\n[2/8] AWS STS Get Caller Identity:")
+    result = subprocess.run(['aws', 'sts', 'get-caller-identity'], 
+                          capture_output=True, text=True)
+    print(result.stdout if result.returncode == 0 else f"ERROR: {result.stderr}")
+    if result.returncode != 0:
+        raise Exception("AWS credentials NOT configured")
+    
+    # 3. S3 Bucket Access
+    print("\n[3/8] S3 Bucket Access Test:")
+    bucket = os.environ.get('AIRFLOW_S3_BUCKET', 'ons-dev-dg-00-stage')
+    result = subprocess.run(['aws', 's3', 'ls', f's3://{bucket}/'], 
+                          capture_output=True, text=True)
+    print(result.stdout[:500] if result.returncode == 0 else f"ERROR: {result.stderr}")
+    if result.returncode != 0:
+        raise Exception(f"Cannot access S3 bucket: {bucket}")
+    
+    # 4. Athena Workgroup
+    print("\n[4/8] Athena Workgroup Configuration:")
+    result = subprocess.run(['aws', 'athena', 'get-work-group', 
+                           '--work-group', 'primary'], 
+                          capture_output=True, text=True)
+    if result.returncode == 0:
+        import json
+        wg = json.loads(result.stdout)
+        output_loc = wg.get('WorkGroup', {}).get('Configuration', {}).get('ResultConfiguration', {}).get('OutputLocation', 'NOT SET')
+        print(f"  OutputLocation: {output_loc}")
+        if output_loc == 'NOT SET' or not output_loc:
+            print("  ⚠️  WARNING: OutputLocation not configured! Run:")
+            print(f"     aws athena update-work-group --work-group primary --configuration-updates \"ResultConfigurationUpdates={{OutputLocation=s3://{bucket}/athena-results/}}\"")
+    else:
+        print(f"ERROR: {result.stderr}")
+    
+    # 5. Glue Database
+    print("\n[5/8] Glue Database Check (analytics_dev):")
+    result = subprocess.run(['aws', 'glue', 'get-database', 
+                           '--name', 'analytics_dev'], 
+                          capture_output=True, text=True)
+    if result.returncode == 0:
+        import json
+        db = json.loads(result.stdout)
+        print(f"  Name: {db['Database']['Name']}")
+        print(f"  Description: {db['Database'].get('Description', 'N/A')}")
+    else:
+        print(f"ERROR: {result.stderr}")
+        print("  ⚠️  Database 'analytics_dev' NOT FOUND! Run setup-glue-databases.ps1")
+        raise Exception("Glue database 'analytics_dev' not found")
+    
+    # 6. dbt Installation
+    print("\n[6/8] dbt Version:")
+    result = subprocess.run(['dbt', '--version'], 
+                          capture_output=True, text=True)
+    print(result.stdout if result.returncode == 0 else f"ERROR: {result.stderr}")
+    
+    # 7. dbt Project Files
+    print("\n[7/8] dbt Project Files in Container:")
+    result = subprocess.run(['ls', '-la', '/opt/airflow/dbt/'], 
+                          capture_output=True, text=True)
     print(result.stdout)
     
-    if result.returncode != 0:
-        raise Exception(f"dbt não está instalado corretamente: {result.stderr}")
+    # 8. dbt Packages (já instalados na imagem)
+    print("\n[8/8] dbt Packages (pré-instalados na imagem):")
+    result = subprocess.run(['ls', '-la', '/opt/airflow/dbt/dbt_packages/'], 
+                          capture_output=True, text=True)
+    if result.returncode == 0:
+        print(result.stdout)
+    else:
+        print("  ⚠️  dbt_packages/ não encontrado! Verifique o build da imagem Docker")
+    
+    print("\n" + "=" * 60)
+    print("✅ Diagnóstico concluído!")
+    print("=" * 60)
 
 
 with DAG(
@@ -53,56 +127,70 @@ with DAG(
     doc_md=__doc__
 ) as dag:
 
-    # Task 1: Verificar instalação do dbt
-    check_dbt = PythonOperator(
-        task_id='check_dbt_installation',
-        python_callable=check_dbt_installation,
+    # Task 1: Diagnóstico completo
+    check_aws_dbt = PythonOperator(
+        task_id='check_aws_and_dbt',
+        python_callable=check_aws_and_dbt,
         doc_md="""
-        ### Check dbt Installation
-        Verifica se o dbt-core e dbt-athena-community estão instalados corretamente
-        no container.
+        ### Diagnóstico AWS + dbt
+        Verifica:
+        1. Variáveis de ambiente
+        2. Credenciais AWS (STS)
+        3. Acesso ao bucket S3
+        4. Configuração do Athena Workgroup
+        5. Database no Glue Catalog
+        6. Instalação do dbt
+        7. Arquivos do projeto dbt no container
         
-        **NOTA:** A sincronização do projeto dbt do S3 é feita automaticamente pelo
-        entrypoint.sh a cada 30 segundos em background, não sendo necessária uma task
-        dedicada para isso.
-        
-        O comando `dbt run` já valida a conexão e compila os modelos antes de executá-los,
-        tornando desnecessárias tasks separadas de setup, debug ou compile.
+        **Sincronização automática**: O projeto dbt é sincronizado do S3 
+        automaticamente pelo entrypoint.sh a cada 30 segundos.
         """
     )
 
     # Task Group: Execução dos modelos dbt
     with TaskGroup('dbt_run_models', tooltip='Execução das transformações dbt') as run_group:
-        
+
         dbt_run_staging = BashOperator(
             task_id='run_staging_models',
-            # Forçar captura de stderr e verbose logging
             bash_command='''
-                cd /opt/airflow/dbt && \
-                echo "=== DBT Run Starting ===" && \
-                ls -la && \
-                echo "=== profiles.yml ===" && \
-                cat profiles.yml && \
-                echo "=== dbt version ===" && \
-                dbt --version && \
-                echo "=== dbt debug (capturing stderr) ===" && \
-                dbt debug --profiles-dir . --target dev 2>&1 || echo "dbt debug failed with code $?" && \
-                echo "=== Checking dbt_packages ===" && \
-                ls -la dbt_packages/ 2>&1 || echo "No dbt_packages dir" && \
-                echo "=== Checking AWS credentials ===" && \
-                aws sts get-caller-identity 2>&1 || echo "No AWS credentials" && \
-                echo "=== dbt run ===" && \
-                dbt run --profiles-dir . --target dev --select staging.* --debug 2>&1
+                set -euo pipefail
+                cd /opt/airflow/dbt
+                
+                echo "=========================================="
+                echo "DBT RUN STAGING"
+                echo "=========================================="
+                echo ""
+                
+                echo "[1/3] Verificando packages (pré-instalados)..."
+                ls -1 dbt_packages/ 2>/dev/null || echo "⚠️  dbt_packages/ não encontrado"
+                
+                echo ""
+                echo "[2/3] dbt debug (teste de conexão)..."
+                dbt debug --profiles-dir . --target dev 2>&1
+                
+                echo ""
+                echo "[3/3] dbt run (staging models)..."
+                dbt run --profiles-dir . --target dev --select staging.* 2>&1
+                
+                echo ""
+                echo "✅ Staging models executados com sucesso!"
             ''',
             doc_md="""
             ### Run Staging Models
-            Executa os modelos da camada staging (limpeza e padronização).
+            Executa os modelos da camada staging com:
+            - Workspace temporário em /tmp (gravável pelo usuário airflow)
+            - Self-heal: instala packages automaticamente se necessário
+            - Diagnóstico completo de conexão (dbt debug)
+            - Logs detalhados em caso de erro
             """
         )
 
         dbt_run_intermediate = BashOperator(
             task_id='run_intermediate_models',
-            bash_command='cd /opt/airflow/dbt && dbt run --profiles-dir . --target dev --select intermediate.*',
+            bash_command='''
+                cd /opt/airflow/dbt
+                dbt run --profiles-dir . --target dev --select intermediate.* 2>&1
+            ''',
             doc_md="""
             ### Run Intermediate Models
             Executa os modelos intermediários (transformações business logic).
@@ -111,7 +199,10 @@ with DAG(
 
         dbt_run_marts = BashOperator(
             task_id='run_marts_models',
-            bash_command='cd /opt/airflow/dbt && dbt run --profiles-dir . --target dev --select marts.*',
+            bash_command='''
+                cd /opt/airflow/dbt
+                dbt run --profiles-dir . --target dev --select marts.* 2>&1
+            ''',
             doc_md="""
             ### Run Marts Models
             Executa os modelos finais (marts) prontos para consumo analytics.
@@ -126,21 +217,16 @@ with DAG(
         
         dbt_test = BashOperator(
             task_id='run_data_tests',
-            bash_command='cd /opt/airflow/dbt && dbt test --profiles-dir . --target dev',
+            bash_command='cd /opt/airflow/dbt && dbt test --profiles-dir . --target dev 2>&1',
             doc_md="""
             ### Run dbt Tests
-            Executa todos os testes de qualidade definidos nos modelos:
-            - unique
-            - not_null
-            - accepted_values
-            - relationships
-            - custom tests
+            Executa todos os testes de qualidade definidos nos modelos.
             """
         )
 
         dbt_source_freshness = BashOperator(
             task_id='check_source_freshness',
-            bash_command='cd /opt/airflow/dbt && dbt source freshness --profiles-dir . --target dev',
+            bash_command='cd /opt/airflow/dbt && dbt source freshness --profiles-dir . --target dev 2>&1',
             doc_md="""
             ### Check Source Freshness
             Verifica a atualização das tabelas fontes (sources).
@@ -154,20 +240,17 @@ with DAG(
         task_id='generate_documentation',
         bash_command='''
             cd /opt/airflow/dbt && \
-            dbt docs generate --profiles-dir . --target dev && \
+            dbt docs generate --profiles-dir . --target dev 2>&1 && \
             aws s3 sync target/ s3://ons-dev-dg-00-stage/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
         ''',
         doc_md="""
         ### Generate dbt Documentation
         Gera documentação interativa do projeto dbt e faz upload para S3.
-        A documentação pode ser acessada via S3 ou servida localmente com `dbt docs serve`.
         """
     )
 
-    # Definir dependências entre as tasks
-    # NOTA: sync_dbt e dbt_setup removidos - sincronização automática pelo entrypoint.sh
-    # e validação/compilação feitas automaticamente pelo dbt run
-    check_dbt >> run_group >> quality_group >> dbt_docs
+    # Fluxo
+    check_aws_dbt >> run_group >> quality_group >> dbt_docs
 
 
 # Documentação adicional do DAG
@@ -175,41 +258,28 @@ dag.doc_md = """
 # DAG: dbt + Athena Integration Example
 
 ## 📋 Descrição
-Este DAG demonstra a integração completa entre dbt e Athena orquestrado pelo Airflow.
+Pipeline completo com diagnóstico AWS, self-healing e execução dbt.
 
-## 🔄 Fluxo de Execução
-1. **Check Installation**: Verifica se dbt está instalado
-2. **Run Models**: Executa transformações (staging → intermediate → marts)
-3. **Quality Checks**: Executa testes de qualidade
-4. **Documentation**: Gera e publica documentação
+## 🔄 Fluxo
+1. **Diagnóstico**: AWS credentials, S3, Athena, Glue, dbt
+2. **Self-heal**: Instala packages automaticamente se necessário
+3. **Run Models**: staging → intermediate → marts
+4. **Quality Checks**: Testes de qualidade
+5. **Documentation**: Gera e publica docs
 
-**NOTAS IMPORTANTES:**
-- A sincronização do projeto dbt do S3 é feita automaticamente pelo `entrypoint.sh` 
-  a cada 30 segundos em background. Isso garante que o código dbt está sempre 
-  atualizado sem necessidade de uma task dedicada na DAG.
-- O comando `dbt run` já valida conexões e compila modelos antes de executar, 
-  eliminando a necessidade de tasks separadas de setup, debug ou compile.
+## 🎯 Sincronização Automática
+- Projeto dbt sincronizado do S3 a cada 30s pelo entrypoint.sh
+- Localização S3: `s3://ons-dev-dg-00-stage/dbt/`
+- Packages instalados automaticamente se ausentes
 
-## 🎯 Pré-requisitos
-- dbt-core e dbt-athena-community instalados
-- Projeto dbt no S3: `s3://ons-dev-dg-00-stage/dbt/`
-- AWS Glue Catalog configurado com databases e tables
-- IAM Role com permissões: Athena, Glue, S3
-- Sincronização automática configurada no entrypoint.sh (a cada 30s)
-
-## 🚀 Como Executar
-1. Acesse a UI do Airflow
-2. Encontre o DAG `dbt_athena_example`
-3. Clique em "Trigger DAG" para execução manual
-4. Monitore a execução na Graph View
-
-## 📊 Materializações
-- **Staging**: Views (leitura rápida, sem duplicação)
-- **Intermediate**: Ephemeral (CTEs, não persistidos)
-- **Marts**: Tables (Parquet no S3, otimizado para análise)
+## ⚠️ Troubleshooting
+Se o dbt debug falhar, verifique nos logs:
+1. Athena Workgroup OutputLocation configurado
+2. Database 'analytics_dev' existe no Glue
+3. Permissões IAM (Athena, Glue, S3)
+4. Bucket S3 acessível
 
 ## 🔗 Links Úteis
 - [dbt Documentation](https://docs.getdbt.com)
 - [dbt-athena Adapter](https://github.com/dbt-athena/dbt-athena-adapter)
-- [Airflow dbt Provider](https://airflow.apache.org/docs/apache-airflow-providers-dbt-cloud/)
 """

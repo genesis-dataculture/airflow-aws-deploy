@@ -3,7 +3,7 @@ FROM apache/airflow:2.8.1-python3.10
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       build-essential default-libmysqlclient-dev awscli curl \
+       build-essential default-libmysqlclient-dev awscli curl git gosu \
     && apt-get autoremove -yqq --purge \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -16,24 +16,14 @@ USER airflow
 COPY docker/requirements.txt /requirements.txt
 RUN pip install --no-cache-dir --user -r /requirements.txt
 
-# Copiar projeto dbt para a imagem
+# Copiar projeto dbt para a imagem (como usuário airflow para ter permissões corretas)
+USER root
 COPY dbt /opt/airflow/dbt
-
-# Instalar packages dbt durante o build (uma vez só)
-WORKDIR /opt/airflow/dbt
-RUN if [ -f "packages.yml" ]; then \
-        echo "===========================================" && \
-        echo "Instalando packages dbt durante o build..." && \
-        echo "===========================================" && \
-        dbt deps --profiles-dir . && \
-        echo "" && \
-        echo "Packages instalados com sucesso:" && \
-        ls -la dbt_packages/ 2>/dev/null || echo "AVISO: Diretório dbt_packages não encontrado"; \
-    else \
-        echo "AVISO: Nenhum packages.yml encontrado, pulando instalação"; \
-    fi
+RUN chown -R airflow:root /opt/airflow/dbt && chmod -R 775 /opt/airflow/dbt
 
 # Voltar para diretório padrão
 WORKDIR /opt/airflow
 
+# CRÍTICO: Entrypoint deve rodar como root para corrigir permissões
+# O entrypoint.sh irá trocar para usuário airflow antes de executar o Airflow
 ENTRYPOINT ["/entrypoint.sh"]

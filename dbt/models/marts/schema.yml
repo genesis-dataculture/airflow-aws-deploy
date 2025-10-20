@@ -50,11 +50,9 @@ models:
         description: "Quantidade de IDs únicos no período"
         tests:
           - not_null
-          # Teste avançado: unique_ids não pode ser maior que total_records
-          - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
-              column_A: total_records
-              column_B: unique_ids
-              or_equal: true
+          # Teste avançado: unique_ids não pode ser negativo
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
               severity: error
       
       - name: first_record_date
@@ -94,4 +92,11 @@ models:
       - dbt_expectations.expect_table_row_count_to_be_between:
           min_value: 1
           max_value: 100000
+          severity: error
+      
+      # Teste de relacionamento entre colunas: total_records >= unique_ids
+      - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
+          column_A: total_records
+          column_B: unique_ids
+          or_equal: true
           severity: error

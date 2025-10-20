@@ -12,6 +12,11 @@ error_exit() {
 echo "Sincronizando DAGs do S3..."
 mkdir -p /opt/airflow/dags
 
+# Corrigir permissões do diretório dags
+echo "[FIX] Corrigindo permissões de /opt/airflow/dags..."
+chown -R airflow:root /opt/airflow/dags 2>/dev/null || echo "[WARNING] Não foi possível corrigir permissões"
+chmod -R 775 /opt/airflow/dags 2>/dev/null || echo "[WARNING] Não foi possível ajustar chmod"
+
 # Check if required environment variables are set
 if [ -z "$AIRFLOW_S3_BUCKET" ] || [ -z "$AIRFLOW_S3_DAGS_PATH" ]; then
     echo "AVISO: AIRFLOW_S3_BUCKET ou AIRFLOW_S3_DAGS_PATH não definidos. Pulando sincronização S3."
@@ -42,6 +47,13 @@ fi
 echo "[LOG] Sincronizando projeto dbt do S3..."
 mkdir -p /opt/airflow/dbt
 
+# CORREÇÃO CRÍTICA: Ajustar permissões do diretório dbt
+# O diretório foi criado durante o Docker build como root
+# Precisa ser acessível pelo usuário airflow (UID 50000)
+echo "[FIX] Corrigindo permissões de /opt/airflow/dbt..."
+chown -R airflow:root /opt/airflow/dbt 2>/dev/null || echo "[WARNING] Falha ao corrigir permissões (ok se não for root)"
+chmod -R 775 /opt/airflow/dbt 2>/dev/null || echo "[WARNING] Falha ao ajustar chmod"
+
 if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
     echo "[LOG] Testando acesso ao dbt no S3: aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/"
     if aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/ 2>/dev/null; then
@@ -61,6 +73,20 @@ if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
             # Configurar sincronização automática de projeto dbt (a cada 30 segundos)
             # SEMPRE excluindo dbt_packages - REMOVIDO --delete para não apagar packages da imagem
             echo "[LOG] Configurando sincronização automática de projeto dbt (a cada 30 segundos)..."
+            
+            # INSTALAÇÃO INICIAL DE PACKAGES (uma vez, na primeira sincronização)
+            if [ ! -d "/opt/airflow/dbt/dbt_packages" ] || [ ! "$(ls -A /opt/airflow/dbt/dbt_packages 2>/dev/null)" ]; then
+                echo "[INFO] Instalando dbt packages (primeira execução)..."
+                if [ -f "/opt/airflow/dbt/packages.yml" ]; then
+                    # Run dbt deps as the airflow user so it uses the user's local python packages
+                    cd /opt/airflow/dbt && gosu airflow bash -lc "dbt deps --profiles-dir ." 2>&1 && \
+                    echo "[SUCCESS] dbt packages instalados:" && \
+                    ls -1 dbt_packages/ 2>/dev/null || echo "[WARNING] Falha ao instalar packages"
+                fi
+            else
+                echo "[INFO] dbt packages já instalados, pulando."
+            fi
+            
             (
               while true; do
                 if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --exclude "dbt_packages/*" 2>/dev/null; then
@@ -102,4 +128,7 @@ fi
 
 # Iniciar o Airflow com o comando passado
 echo "Iniciando o Airflow..."
-exec /usr/bin/dumb-init -- /home/airflow/.local/bin/airflow "$@"
+
+# Trocar para usuário airflow antes de executar o Airflow
+# (o entrypoint roda como root para corrigir permissões, mas Airflow deve rodar como airflow)
+exec gosu airflow /usr/bin/dumb-init -- /home/airflow/.local/bin/airflow "$@"
