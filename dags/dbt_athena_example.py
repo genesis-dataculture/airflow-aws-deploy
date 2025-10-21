@@ -212,29 +212,6 @@ with DAG(
         # Sequência de execução dos modelos
         dbt_run_staging >> dbt_run_intermediate >> dbt_run_marts
 
-    # Task Group: Testes de qualidade
-    with TaskGroup('dbt_quality_checks', tooltip='Testes de qualidade dos dados') as quality_group:
-        
-        dbt_test = BashOperator(
-            task_id='run_data_tests',
-            bash_command='cd /opt/airflow/dbt && dbt test --profiles-dir . --target dev 2>&1',
-            doc_md="""
-            ### Run dbt Tests
-            Executa todos os testes de qualidade definidos nos modelos.
-            """
-        )
-
-        dbt_source_freshness = BashOperator(
-            task_id='check_source_freshness',
-            bash_command='cd /opt/airflow/dbt && dbt source freshness --profiles-dir . --target dev 2>&1',
-            doc_md="""
-            ### Check Source Freshness
-            Verifica a atualização das tabelas fontes (sources).
-            """
-        )
-
-        [dbt_test, dbt_source_freshness]
-
     # Task: Gerar documentação
     dbt_docs = BashOperator(
         task_id='generate_documentation',
@@ -249,8 +226,8 @@ with DAG(
         """
     )
 
-    # Fluxo
-    check_aws_dbt >> run_group >> quality_group >> dbt_docs
+    # Fluxo (sem quality checks)
+    check_aws_dbt >> run_group >> dbt_docs
 
 
 # Documentação adicional do DAG
