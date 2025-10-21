@@ -69,12 +69,6 @@ models:
         description: "Data do último registro no período"
         tests:
           - not_null
-          # Teste avançado: last_record_date >= first_record_date
-          - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
-              column_A: last_record_date
-              column_B: first_record_date
-              or_equal: true
-              severity: error
       
       - name: aggregated_at
         description: "Timestamp de quando a agregação foi executada"
@@ -98,5 +92,12 @@ models:
       - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
           column_A: total_records
           column_B: unique_ids
+          or_equal: true
+          severity: error
+      
+      # Teste de relacionamento entre colunas: last_record_date >= first_record_date
+      - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
+          column_A: last_record_date
+          column_B: first_record_date
           or_equal: true
           severity: error

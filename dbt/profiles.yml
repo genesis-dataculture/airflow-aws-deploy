@@ -5,6 +5,7 @@ default:
       type: athena
       s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'ons-dev-dg-00-stage') }}/athena-results/dev/"
       region_name: us-east-1
+      catalog_name: AwsDataCatalog
       database: analytics_dev
       schema: dbt_dev
       work_group: primary
@@ -15,6 +16,7 @@ default:
       type: athena
       s3_staging_dir: "s3://{{ env_var('DBT_ATHENA_S3_STAGING', 'ons-dev-dg-00-stage') }}/athena-results/prod/"
       region_name: us-east-1
+      catalog_name: AwsDataCatalog
       database: analytics_prod
       schema: dbt_prod
       work_group: primary

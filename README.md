@@ -25,12 +25,90 @@ A arquitetura deste projeto inclui:
   - Execução orquestrada via Airflow DAGs
   - Materializações em AWS Athena com Glue Catalog
 
+### 🔐 Permissões Necessárias (Resumo)
+
+Este projeto requer as seguintes permissões AWS configuradas:
+
+**1. IAM Role: `airflow-task-execution-role`**
+- ✅ **AmazonECSTaskExecutionRolePolicy** (managed policy)
+  - ECR: Pull de imagens Docker
+  - CloudWatch: Escrita de logs
+  
+- ✅ **AirflowDbtAthenaPolicy** (custom policy - `iam-dbt-policy.json`)
+  - **Athena**: StartQueryExecution, GetQueryResults, etc (11 permissões)
+  - **Glue Catalog**: CreateTable, UpdateTable, GetDatabase, etc (15 permissões)
+  - **S3**: GetObject, PutObject, ListBucket no bucket `ons-dev-dg-00-stage`
+  - **CloudWatch Logs**: CreateLogGroup, PutLogEvents
+
+**2. AWS Lake Formation**
+- ✅ **Database**: `ALL` permissions no `analytics_dev`
+- ✅ **Tables**: `ALL` permissions (TableWildcard) em todas as tabelas
+- 📝 Configurado via script: `grant-lakeformation-permissions.ps1`
+
+**3. Terraform (para provisionamento de infraestrutura)**
+- ✅ EC2, ECS, RDS, S3, VPC, IAM, ECR, Application Load Balancer
+- 📝 Recomendado: AdministratorAccess ou políticas específicas por serviço
+
+**Arquivos de Configuração de Permissões:**
+- 📄 `iam-dbt-policy.json` - Política IAM customizada (Athena + Glue + S3)
+- 📄 `grant-lakeformation-permissions.ps1` - Script de Lake Formation
+- 📄 `terraform/main.tf` - Infraestrutura como código
+
 ## Pré-requisitos
 
 - AWS CLI configurada
 - Terraform instalado (v1.0.0+)
 - Docker instalado
 - Permissões na AWS para criar e gerenciar os recursos necessários
+
+## 📁 Estrutura do Repositório
+
+```
+airflow-docker-i/
+├── dags/                              # Airflow DAGs
+│   ├── dbt_athena_example.py         # DAG exemplo com dbt + Athena
+│   ├── etl_sample_with_groups.py     # DAG exemplo com TaskGroups
+│   └── example_dag.py                # DAG exemplo básico
+│
+├── dbt/                               # Projeto dbt
+│   ├── dbt_project.yml               # Configuração do projeto dbt
+│   ├── profiles.yml                  # Conexão Athena (dev/prod)
+│   ├── packages.yml                  # dbt_utils + dbt_expectations
+│   ├── models/                       # Modelos de transformação
+│   │   ├── staging/                  # Camada staging (views)
+│   │   └── marts/                    # Camada marts (tables)
+│   ├── tests/                        # Testes customizados
+│   ├── macros/                       # Macros reutilizáveis
+│   ├── seeds/                        # Dados estáticos (CSV)
+│   ├── README.md                     # Documentação do projeto dbt
+│   ├── PACKAGES_GUIDE.md             # Guia de uso dos packages
+│   └── DEPLOY.md                     # Pipeline de deploy dbt
+│
+├── docker/                            # Configuração Docker
+│   ├── Dockerfile                    # Imagem Airflow customizada
+│   ├── entrypoint.sh                 # Script de inicialização
+│   ├── requirements.txt              # Dependências Python
+│   ├── build-and-deploy.ps1          # Script automatizado de build/deploy
+│   └── test-image-locally.ps1        # Validação local da imagem
+│
+├── terraform/                         # Infraestrutura como código
+│   ├── main.tf                       # Recursos principais
+│   ├── variables.tf                  # Variáveis do Terraform
+│   ├── outputs.tf                    # Outputs (URLs, ARNs, etc)
+│   ├── providers.tf                  # Configuração AWS provider
+│   ├── terraform.tfvars              # Valores das variáveis
+│   └── modules/                      # Módulos customizados
+│       ├── ecs/                      # ECS Fargate cluster
+│       ├── networking/               # VPC, subnets, ALB
+│       ├── rds/                      # PostgreSQL database
+│       └── s3/                       # S3 buckets
+│
+├── iam-dbt-policy.json               # Política IAM para dbt + Athena
+├── grant-lakeformation-permissions.ps1 # Script de permissões Lake Formation
+├── README.md                         # Este arquivo
+├── IMPLEMENTATION_COMPLETE.md        # Resumo técnico da implementação
+└── IMPLEMENTATION_SUMMARY.md         # Documentação do processo
+```
 
 ## Configuração e Deploy
 
@@ -128,11 +206,55 @@ aws iam list-attached-role-policies --role-name airflow-task-execution-role
 Remove-Item trust-policy.json
 ```
 
-**Permissões incluídas na política AirflowDbtAthenaPolicy:**
-- **Athena**: Executar queries, acessar workgroups e metadados
-- **Glue Catalog**: Criar/ler/atualizar tabelas e databases
-- **S3**: Acesso completo ao bucket `ons-dev-dg-00-stage` (DAGs, dbt, logs, resultados Athena)
-- **CloudWatch Logs**: Escrita de logs das tasks ECS
+**Permissões incluídas na política AirflowDbtAthenaPolicy (`iam-dbt-policy.json`):**
+
+**Athena (AthenaQueryAccess):**
+- ✅ `athena:StartQueryExecution` - Iniciar execução de queries
+- ✅ `athena:GetQueryExecution` - Obter status de execução
+- ✅ `athena:GetQueryResults` - Recuperar resultados de queries
+- ✅ `athena:StopQueryExecution` - Cancelar queries em execução
+- ✅ `athena:GetWorkGroup` - Acessar configurações do workgroup
+- ✅ `athena:ListWorkGroups` - Listar workgroups disponíveis
+- ✅ `athena:GetDataCatalog` - Acessar catálogo de dados
+- ✅ `athena:GetDatabase` - Obter metadados do database
+- ✅ `athena:GetTableMetadata` - Obter metadados de tabelas
+- ✅ `athena:ListDatabases` - Listar databases
+- ✅ `athena:ListTableMetadata` - Listar metadados de tabelas
+
+**Glue Catalog (GlueCatalogAccess):**
+- ✅ `glue:GetDatabase` / `glue:GetDatabases` - Ler databases
+- ✅ `glue:GetTable` / `glue:GetTables` - Ler tabelas
+- ✅ `glue:CreateTable` - Criar novas tabelas (dbt materializations)
+- ✅ `glue:UpdateTable` - Atualizar schema de tabelas
+- ✅ `glue:DeleteTable` - Deletar tabelas (drop models)
+- ✅ `glue:GetPartition` / `glue:GetPartitions` - Ler partições
+- ✅ `glue:CreatePartition` / `glue:BatchCreatePartition` - Criar partições
+- ✅ `glue:UpdatePartition` - Atualizar partições
+- ✅ `glue:DeletePartition` / `glue:BatchDeletePartition` - Deletar partições
+- ✅ `glue:GetTableVersions` - Histórico de versões
+
+**S3 (S3FullAccess no bucket `ons-dev-dg-00-stage`):**
+- ✅ `s3:GetObject` - Ler arquivos (DAGs, dbt code, seeds)
+- ✅ `s3:PutObject` - Escrever arquivos (resultados Athena, logs)
+- ✅ `s3:DeleteObject` - Deletar arquivos
+- ✅ `s3:ListBucket` - Listar conteúdo do bucket
+- ✅ `s3:GetBucketLocation` - Obter região do bucket
+- ✅ `s3:GetBucketVersioning` - Verificar versionamento
+- ✅ `s3:ListBucketMultipartUploads` - Gerenciar uploads grandes
+- ✅ `s3:AbortMultipartUpload` - Cancelar uploads em progresso
+
+**CloudWatch Logs (CloudWatchLogsAccess):**
+- ✅ `logs:CreateLogGroup` - Criar grupos de log
+- ✅ `logs:CreateLogStream` - Criar streams de log
+- ✅ `logs:PutLogEvents` - Escrever eventos de log
+- ✅ `logs:DescribeLogStreams` - Listar streams disponíveis
+- 📂 Resource: `/ecs/airflow*` e `/aws/ecs/airflow*`
+
+**Managed Policy (anexada automaticamente):**
+- ✅ `AmazonECSTaskExecutionRolePolicy` - Permite ECS:
+  - Pull de imagens do ECR
+  - Escrita de logs no CloudWatch
+  - Acesso a secrets do Secrets Manager (se configurado)
 
 ### 7. Implantar a infraestrutura com Terraform
 
@@ -187,9 +309,41 @@ Se os databases/tables do Glue estiverem protegidos por AWS Lake Formation, é n
 ```
 
 **O que o script faz:**
-- Concede permissões `ALL` no database `analytics_dev` para a role do Airflow
-- Concede permissões `ALL` em todas as tabelas do database (TableWildcard)
-- Permite que o dbt crie, leia e modifique tabelas via Athena
+1. **Database Permissions**: Concede `ALL` no database `analytics_dev`:
+   ```json
+   {
+     "Principal": "arn:aws:iam::730335315247:role/airflow-task-execution-role",
+     "Permissions": ["ALL"],
+     "Resource": {
+       "Database": {
+         "Name": "analytics_dev"
+       }
+     }
+   }
+   ```
+
+2. **Table Permissions**: Concede `ALL` em todas as tabelas (TableWildcard):
+   ```json
+   {
+     "Principal": "arn:aws:iam::730335315247:role/airflow-task-execution-role",
+     "Permissions": ["ALL"],
+     "Resource": {
+       "Table": {
+         "DatabaseName": "analytics_dev",
+         "TableWildcard": {}
+       }
+     }
+   }
+   ```
+
+**Permissões Lake Formation incluídas em ALL:**
+- ✅ `ALTER` - Modificar schema de tabelas
+- ✅ `DELETE` - Deletar dados
+- ✅ `DESCRIBE` - Ler metadados
+- ✅ `DROP` - Deletar tabelas/databases
+- ✅ `INSERT` - Inserir dados (dbt materializations)
+- ✅ `SELECT` - Consultar dados (queries Athena)
+- ✅ `CREATE_TABLE` - Criar novas tabelas (dbt models)
 
 **Alternativa manual (via AWS Console):**
 1. Acesse AWS Lake Formation → Databases
@@ -211,6 +365,17 @@ aws glue get-database --name analytics_dev
 ```
 AccessDeniedException: Insufficient Lake Formation permission(s) on analytics_dev
 ```
+
+**Por que Lake Formation é necessário?**
+
+Lake Formation adiciona uma camada extra de segurança sobre o Glue Catalog. Mesmo com permissões IAM corretas (`glue:*`), você ainda precisa de permissões Lake Formation explícitas se o database estiver protegido.
+
+**Diferença entre IAM e Lake Formation:**
+- ❌ **Apenas IAM**: `glue:GetDatabase` → ✅ Permite AWS API call
+- ❌ **Lake Formation ativo**: Mesmo com IAM, precisa de permissão LF → ❌ AccessDeniedException
+- ✅ **IAM + Lake Formation**: Ambas permissões concedidas → ✅ Acesso total
+
+
 
 ## Atualização das DAGs e Projeto dbt
 
