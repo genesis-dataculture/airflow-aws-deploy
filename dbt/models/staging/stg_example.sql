@@ -34,8 +34,8 @@ cleaned as (
         year(created_at) as year,
         month(created_at) as month,
         
-        -- Usar dbt_utils para timestamp atual
-        {{ dbt_utils.current_timestamp() }} as loaded_at
+    -- Timestamp atual sem timezone (Glue não suporta timestamp with time zone)
+    CAST(current_timestamp AS timestamp) as loaded_at
         
     from source_data
     where created_at is not null

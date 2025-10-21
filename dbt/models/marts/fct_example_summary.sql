@@ -8,7 +8,8 @@
         file_format='parquet',
         location_root='s3://ons-dev-dg-00-stage/dbt-data/marts',
         table_type='hive',
-        write_compression='snappy'
+        write_compression='snappy',
+        partitioned_by=['year', 'month']
     )
 }}
 
@@ -24,15 +25,16 @@ aggregated as (
         -- Gerar chave sintética para o agregado usando dbt_utils
         {{ dbt_utils.generate_surrogate_key(['year', 'month']) }} as summary_key,
         
-        year,
-        month,
+        -- Métricas de agregação
         count(*) as total_records,
         count(distinct id) as unique_ids,
         min(created_at) as first_record_date,
         max(created_at) as last_record_date,
-        
-        -- Usar dbt_utils para timestamp atual
-        {{ dbt_utils.current_timestamp() }} as aggregated_at
+        -- Timestamp atual sem timezone (Glue não suporta timestamp with time zone)
+        CAST(current_timestamp AS timestamp) as aggregated_at,
+        -- Partições DEVEM ser as últimas colunas e na ordem do partitioned_by
+        year,
+        month
         
     from staging_data
     group by year, month

@@ -5,8 +5,9 @@ default:
       type: athena
       s3_staging_dir: s3://ons-dev-dg-00-stage/athena-results/dev/
       region_name: us-east-1
-      database: AwsDataCatalog        # Catalog (conforme doc da PyPI)
-      schema: analytics_dev           # Glue Database
+      catalog_name: AwsDataCatalog      # ← Nome do Data Catalog (geralmente AwsDataCatalog)
+      database: analytics_dev            # ← Nome do DATABASE no Glue (DEVE EXISTIR!)
+      schema: dbt_dev                    # ← Nome do SCHEMA/DATABASE no Athena
       work_group: primary
       threads: 4
       aws_profile_name: null
@@ -15,8 +16,9 @@ default:
       type: athena
       s3_staging_dir: s3://ons-dev-dg-00-stage/athena-results/prod/
       region_name: us-east-1
-      database: AwsDataCatalog        # Catalog
-      schema: analytics_prod          # Glue Database
+      catalog_name: AwsDataCatalog
+      database: analytics_prod           # ← DEVE EXISTIR no Glue!
+      schema: dbt_prod
       work_group: primary
       threads: 8
       aws_profile_name: null
