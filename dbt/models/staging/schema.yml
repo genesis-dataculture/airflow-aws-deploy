@@ -12,6 +12,45 @@ models:
         tests:
           - unique
           - not_null
+
+  - name: stg_customers
+    description: "Staging de clientes proveniente de seed customers.csv"
+    columns:
+      - name: customer_key
+        description: "Chave sintética do cliente"
+        tests: [not_null, unique]
+      - name: customer_id
+        description: "ID do cliente"
+        tests: [not_null]
+      - name: signup_date
+        description: "Data de cadastro"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "cast('2020-01-01' as date)"
+              max_value: "current_date + interval '1' day"
+              severity: warn
+
+  - name: stg_orders
+    description: "Staging de pedidos proveniente de seed orders.csv"
+    columns:
+      - name: order_key
+        description: "Chave sintética do pedido"
+        tests: [not_null, unique]
+      - name: order_id
+        description: "ID do pedido"
+        tests: [not_null]
+      - name: customer_id
+        description: "ID do cliente do pedido"
+        tests: [not_null]
+      - name: order_date
+        description: "Data do pedido"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "cast('2020-01-01' as date)"
+              max_value: "current_date + interval '1' day"
+              severity: warn
       
       - name: id
         description: "ID único do registro"

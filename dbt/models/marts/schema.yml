@@ -94,10 +94,67 @@ models:
           column_B: unique_ids
           or_equal: true
           severity: error
-      
+
+  - name: fct_orders_summary
+    description: "Resumo de pedidos por ano/mês (apenas status paid)"
+    columns:
+      - name: summary_key
+        description: "Chave sintética ano+mês"
+        tests: [not_null, unique]
+      - name: total_orders
+        description: "Total de pedidos no período"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              severity: error
+      - name: unique_customers
+        description: "Clientes distintos no período"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              severity: warn
+      - name: total_amount
+        description: "Valor total dos pedidos (paid)"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              severity: error
+      - name: first_order_date
+        description: "Primeira data do pedido no período"
+        tests: [not_null]
+      - name: last_order_date
+        description: "Última data do pedido no período"
+        tests: [not_null]
+      - name: aggregated_at
+        description: "Timestamp da agregação"
+        tests: [not_null]
+      - name: year
+        description: "Ano da partição"
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 2020
+              max_value: 2030
+              severity: warn
+      - name: month
+        description: "Mês da partição"
+        tests:
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: [1,2,3,4,5,6,7,8,9,10,11,12]
+              severity: error
+
+    # Testes no nível do modelo
+    tests:
       # Teste de relacionamento entre colunas: last_record_date >= first_record_date
       - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
           column_A: last_record_date
           column_B: first_record_date
           or_equal: true
           severity: error
+      # Tabela não deve estar vazia
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+          severity: warn
+
