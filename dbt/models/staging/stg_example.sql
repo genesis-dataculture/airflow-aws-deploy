@@ -14,7 +14,7 @@
 
 with source_data as (
     -- Descomente quando tiver a tabela real configurada no Glue Catalog
-    -- select * from {{ source('raw', 'example_table') }}
+    -- select * from {{ source('raw_data', 'example_table') }}
     
     -- Dados de exemplo para teste
     select

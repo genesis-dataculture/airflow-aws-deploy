@@ -1,14 +1,13 @@
 version: 2
 
 sources:
-  - name: raw
+  - name: raw_data
     description: "Dados brutos do Data Lake no S3"
-    database: raw_data
-    schema: raw
+    database: AwsDataCatalog
+    schema: raw_data
     tables:
       - name: example_table
         description: "Tabela de exemplo para demonstração"
-        external_location: "s3://ons-dev-dg-00-stage/raw-data/example/"
         columns:
           - name: id
             description: "ID único do registro"
