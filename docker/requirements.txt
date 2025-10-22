@@ -8,7 +8,6 @@ pendulum>=2.1.0,<3.0.0
 pyodbc>=5.1.0,<6.0.0
 
 # dbt + Athena integration
-# Fixar versões compatíveis para evitar conflitos de dependências
 apache-airflow-providers-dbt-cloud==3.5.1
 dbt-core==1.7.17
 dbt-athena-community==1.7.2
