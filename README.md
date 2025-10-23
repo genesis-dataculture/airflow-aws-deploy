@@ -155,9 +155,14 @@ Write-Host "Permissões concedidas para $roleArn em $databaseName (Database + Ta
 ## ⚙️ Configuração e Deploy do Airflow
 
 ```bash
-docker build --no-cache -f docker/Dockerfile -t airflow-dbt-athena:latest .
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 730335315247.dkr.ecr.us-east-1.amazonaws.com
+
+aws ecr create-repository --repository-name airflow-on-ecs-fargate --region us-east-1
+
+docker build --no-cache -f docker/Dockerfile -t airflow-dbt-athena:latest .
+
 docker tag airflow-dbt-athena:latest 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
+
 docker push 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
 ```
 

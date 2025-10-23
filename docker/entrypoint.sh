@@ -109,20 +109,20 @@ fi
 
 # Initialize Airflow database if this is the webserver
 if [ "$1" = "webserver" ]; then
-    echo "Inicializando banco de dados do Airflow..."
-    airflow db init || error_exit "Falha ao inicializar o banco de dados"
-    
+    echo "Inicializando banco de dados do Airflow (como usuário airflow)..."
+    gosu airflow bash -lc "/home/airflow/.local/bin/airflow db init" || error_exit "Falha ao inicializar o banco de dados"
+
     # Create admin user if it doesn't exist
     echo "Verificando usuário admin..."
-    if ! airflow users list | grep -q "admin"; then
+    if ! gosu airflow bash -lc "/home/airflow/.local/bin/airflow users list | grep -qw admin"; then
         echo "Criando usuário admin..."
-        airflow users create \
+        gosu airflow bash -lc "/home/airflow/.local/bin/airflow users create \
             --username admin \
             --firstname Admin \
             --lastname User \
             --role Admin \
             --email admin@airflow.local \
-            --password admin || echo "AVISO: Falha ao criar usuário admin"
+            --password admin" || echo "AVISO: Falha ao criar usuário admin"
     fi
 fi
 
