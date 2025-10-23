@@ -16,3 +16,100 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 .env
+// ...existing code...
+
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.python-version
+.mypy_cache/
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+cache/
+pip-wheel-metadata/
+dist/
+build/
+
+# -----------------------------
+# Airflow (locais)
+# -----------------------------
+airflow/
+airflow/logs/
+logs/
+tmp/
+
+# -----------------------------
+# dbt (artefatos locais – redundante ao dbt/.gitignore)
+# -----------------------------
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# -----------------------------
+# Terraform extras
+# -----------------------------
+*.tfplan
+*.tfplan.*
+*.auto.tfvars
+*.auto.tfvars.json
+
+# -----------------------------
+# Docker
+# -----------------------------
+docker/*.log
+*.tar
+*.tar.gz
+*.img
+
+# -----------------------------
+# IDE/Editor (mantemos .vscode rastreado)
+# -----------------------------
+.idea/
+*.code-workspace
+
+# -----------------------------
+# SO/Arquivos temporários
+# -----------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+
+# -----------------------------
+# Chaves/Certs (sensíveis)
+# -----------------------------
+*.pem
+*.key
+*.p12
+*.crt
+id_rsa
+id_rsa.pub
+
+# -----------------------------
+# Swap/temporários
+# -----------------------------
+*.swp
+*.swo
+
+
+# -----------------------------
+# IDE/Editor (VS Code - ignore quase tudo)
+# -----------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.vscode-test/
+.history/
+.idea/
+*.code-workspace
