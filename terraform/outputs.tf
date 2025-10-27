@@ -1,6 +1,16 @@
 output "airflow_ui_url" {
-  description = "URL para acessar a interface do Airflow"
-  value       = "http://${module.ecs.airflow_alb_dns}"
+  description = "URL para acessar a interface do Airflow (via CloudFront HTTPS)"
+  value       = "https://${module.cdn.cloudfront_domain_name}"
+}
+
+output "cloudfront_domain_name" {
+  description = "Domínio do CloudFront (*.cloudfront.net)"
+  value       = module.cdn.cloudfront_domain_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "ID da distribuição CloudFront"
+  value       = module.cdn.cloudfront_distribution_id
 }
 
 output "s3_bucket_name" {

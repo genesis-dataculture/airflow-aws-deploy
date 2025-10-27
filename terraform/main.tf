@@ -26,3 +26,8 @@ module "ecs" {
   s3_bucket_name      = var.airflow_bucket_name
   db_connection_string = "postgresql://${var.db_username}:${var.db_password}@${module.rds.db_instance_endpoint}/${var.db_name}"
 }
+
+module "cdn" {
+  source             = "./modules/cdn"
+  origin_domain_name = module.ecs.airflow_alb_dns
+}
