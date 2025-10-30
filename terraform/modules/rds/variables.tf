@@ -24,7 +24,7 @@ variable "db_password" {
   sensitive   = true
 }
 
-variable "sg_id"{
+variable "sg_id" {
   description = "ID do Security Group"
-  type = list(string)
+  type        = list(string)
 }

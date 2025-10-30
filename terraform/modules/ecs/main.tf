@@ -49,7 +49,8 @@
 # }
 
 resource "aws_lb" "airflow" {
-  name               = "airflow-alb"
+  # Use a short prefix (max 6 chars) to avoid name collisions if an ALB with the exact name already exists
+  name_prefix        = "airfl-"
   internal           = true
   load_balancer_type = "application"
   security_groups    = var.sg_id
@@ -61,12 +62,13 @@ resource "aws_lb" "airflow" {
 }
 
 resource "aws_lb_target_group" "airflow" {
-  name     = "airflow-tg"
-  port     = 8080
-  protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  # Use a short prefix (max 6 chars) to avoid name collisions for target group names (unique per VPC)
+  name_prefix = "airfl-"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
   target_type = "ip"
-  
+
   health_check {
     enabled             = true
     interval            = 30
@@ -118,7 +120,7 @@ resource "aws_ecs_task_definition" "airflow_webserver" {
       image     = var.aws_ecr_repository
       essential = true
       command   = ["webserver"]
-      
+
       environment = [
         { name = "AIRFLOW__CORE__EXECUTOR", value = "LocalExecutor" },
         { name = "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN", value = var.db_connection_string },
@@ -143,22 +145,22 @@ resource "aws_ecs_task_definition" "airflow_webserver" {
         { name = "DBT_ATHENA_S3_STAGING", value = var.s3_bucket_name },
         { name = "AIRFLOW_S3_DBT_PATH", value = "dbt" }
       ],
-      
+
       portMappings = [
         {
           containerPort = 8080
           protocol      = "tcp"
         }
       ],
-      
+
       healthCheck = {
-        command = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
-        interval = 30
-        timeout = 5
-        retries = 3
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
         startPeriod = 60
       },
-      
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -187,7 +189,7 @@ resource "aws_ecs_task_definition" "airflow_scheduler" {
       image     = var.aws_ecr_repository
       essential = true
       command   = ["scheduler"]
-      
+
       environment = [
         { name = "AIRFLOW__CORE__EXECUTOR", value = "LocalExecutor" },
         { name = "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN", value = var.db_connection_string },
@@ -210,7 +212,7 @@ resource "aws_ecs_task_definition" "airflow_scheduler" {
         { name = "DBT_ATHENA_S3_STAGING", value = var.s3_bucket_name },
         { name = "AIRFLOW_S3_DBT_PATH", value = "dbt" }
       ],
-      
+
       logConfiguration = {
         logDriver = "awslogs"
         options = {

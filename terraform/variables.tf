@@ -35,17 +35,17 @@ variable "airflow_bucket_name" {
   type        = string
 }
 
-variable "vpc_id"{
+variable "vpc_id" {
   description = "ID da VPC"
-  type = string
+  type        = string
 }
 
-variable "subnet_id"{
+variable "subnet_id" {
   description = "ID da subnet"
-  type = list(string)
+  type        = list(string)
 }
 
-variable "sg_id"{
+variable "sg_id" {
   description = "ID do Security Group"
-  type = string
+  type        = string
 }
