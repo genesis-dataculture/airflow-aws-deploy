@@ -32,3 +32,8 @@ module "ecs" {
   db_connection_string = "postgresql://${var.db_username}:${var.db_password}@${module.rds.db_instance_endpoint}/${var.db_name}"
   sg_id                = [var.sg_id]
 }
+
+module "cdn" {
+  source             = "./modules/cdn"
+  origin_domain_name = module.ecs.airflow_alb_dns
+}

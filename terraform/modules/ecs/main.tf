@@ -136,7 +136,12 @@ resource "aws_ecs_task_definition" "airflow_webserver" {
         { name = "AIRFLOW__LOGGING__REMOTE_LOGGING", value = "true" },
         { name = "AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER", value = "s3://${var.s3_bucket_name}/airflow/logs" },
         { name = "AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID", value = "aws_default" },
-        { name = "AWS_DEFAULT_REGION", value = "us-east-1" }
+        { name = "AWS_DEFAULT_REGION", value = "us-east-1" },
+        # --- dbt + Athena integration ---
+        { name = "DBT_PROFILES_DIR", value = "/opt/airflow/dbt" },
+        { name = "DBT_PROJECT_DIR", value = "/opt/airflow/dbt" },
+        { name = "DBT_ATHENA_S3_STAGING", value = var.s3_bucket_name },
+        { name = "AIRFLOW_S3_DBT_PATH", value = "dbt" }
       ],
       
       portMappings = [
@@ -198,7 +203,12 @@ resource "aws_ecs_task_definition" "airflow_scheduler" {
         { name = "AIRFLOW__LOGGING__REMOTE_LOGGING", value = "true" },
         { name = "AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER", value = "s3://${var.s3_bucket_name}/airflow/logs" },
         { name = "AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID", value = "aws_default" },
-        { name = "AWS_DEFAULT_REGION", value = "us-east-1" }
+        { name = "AWS_DEFAULT_REGION", value = "us-east-1" },
+        # --- dbt + Athena integration ---
+        { name = "DBT_PROFILES_DIR", value = "/opt/airflow/dbt" },
+        { name = "DBT_PROJECT_DIR", value = "/opt/airflow/dbt" },
+        { name = "DBT_ATHENA_S3_STAGING", value = var.s3_bucket_name },
+        { name = "AIRFLOW_S3_DBT_PATH", value = "dbt" }
       ],
       
       logConfiguration = {

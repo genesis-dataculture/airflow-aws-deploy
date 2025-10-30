@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: raw_data
+    description: "Dados brutos do Data Lake no S3"
+    database: AwsDataCatalog
+    schema: raw_data
+    tables:
+      - name: example_table
+        description: "Tabela de exemplo para demonstração"
+        columns:
+          - name: id
+            description: "ID único do registro"
+            tests:
+              - unique
+              - not_null
+          - name: created_at
+            description: "Data de criação do registro"
+            tests:
+              - not_null
+          - name: value
+            description: "Valor do registro"

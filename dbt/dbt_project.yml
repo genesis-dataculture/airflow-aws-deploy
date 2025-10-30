@@ -1,0 +1,42 @@
+name: 'airflow_athena_project'
+version: '1.0.0'
+config-version: 2
+
+profile: 'default'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  airflow_athena_project:
+    staging:
+      +materialized: view
+      +schema: staging
+      +location_root: "s3://ons-dev-dg-00-stage/dbt-data/staging"
+      +file_format: parquet
+      
+    intermediate:
+      +materialized: ephemeral
+      
+    marts:
+      +materialized: table
+      +schema: marts
+      +location_root: "s3://ons-dev-dg-00-stage/dbt-data/marts"
+      +file_format: parquet
+      +partitioned_by: ['year', 'month']
+      +table_type: hive
+      +format: parquet
+      +write_compression: snappy
+
+seeds:
+  +file_format: parquet
+  +location_root: "s3://ons-dev-dg-00-stage/dbt-data/seeds"

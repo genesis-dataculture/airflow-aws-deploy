@@ -1,0 +1,31 @@
+# dbt artifacts
+target/
+dbt_packages/
+logs/
+
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+
+# Compiled files
+*.log
