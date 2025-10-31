@@ -278,6 +278,7 @@ with DAG(
             dbt docs generate --profiles-dir . --target dev 2>&1 && \
             aws s3 sync target/ s3://{BUCKET_NAME}/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
         ''',
+        trigger_rule='all_done',
         doc_md="""
         ### Generate dbt Documentation
         Gera documentação interativa do projeto dbt e faz upload para S3.
