@@ -3,8 +3,8 @@ default:
   outputs:
     dev:
       type: athena
-      s3_staging_dir: s3://ons-dev-dg-00-stage/athena-results/dev/
-      s3_data_dir: s3://ons-dev-dg-00-stage/dbt-data/seeds/dev/
+      s3_staging_dir: s3://ons-dg-00-dev-stage/athena-results/dev/
+      s3_data_dir: s3://ons-dg-00-dev-stage/dbt-data/seeds/dev/
       region_name: us-east-1
       database: AwsDataCatalog        # Catalog (conforme doc da PyPI)
       schema: analytics_dev           # Glue Database
@@ -14,8 +14,8 @@ default:
       
     prod:
       type: athena
-      s3_staging_dir: s3://ons-dev-dg-00-stage/athena-results/prod/
-      s3_data_dir: s3://ons-dev-dg-00-stage/dbt-data/seeds/prod/
+      s3_staging_dir: s3://ons-dg-00-dev-stage/athena-results/prod/
+      s3_data_dir: s3://ons-dg-00-dev-stage/dbt-data/seeds/prod/
       region_name: us-east-1
       database: AwsDataCatalog        # Catalog
       schema: analytics_prod          # Glue Database

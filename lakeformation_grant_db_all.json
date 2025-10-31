@@ -1,0 +1,8 @@
+{
+  "Principal": {
+    "DataLakePrincipalIdentifier": "arn:aws:iam::124679861210:role/ecsTaskExecutionRole"
+  },
+  "Resource": { "Database": { "Name": "analytics_dev" } },
+  "Permissions": ["ALL"],
+  "PermissionsWithGrantOption": []
+}

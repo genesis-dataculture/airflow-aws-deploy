@@ -1,0 +1,7 @@
+{
+  "Principal": {
+    "DataLakePrincipalIdentifier": "arn:aws:iam::124679861210:role/ecsTaskExecutionRole"
+  },
+  "Resource": { "Catalog": {} },
+  "Permissions": ["CREATE_DATABASE"]
+}

@@ -96,8 +96,8 @@ Abaixo está o conteúdo **integral** da política IAM utilizada:
         "s3:AbortMultipartUpload"
       ],
       "Resource": [
-        "arn:aws:s3:::ons-dev-dg-00-stage",
-        "arn:aws:s3:::ons-dev-dg-00-stage/*"
+        "arn:aws:s3:::ons-dg-00-dev-stage",
+        "arn:aws:s3:::ons-dg-00-dev-stage/*"
       ]
     },
     {
@@ -175,7 +175,7 @@ db_username = "airflow"
 db_password = "airflow12345"
 iam_role_ecs = "arn:aws:iam::730335315247:role/airflow-task-execution-role"
 aws_ecr_repository = "730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest"
-airflow_bucket_name = "ons-dev-dg-00-stage"
+airflow_bucket_name = "ons-dg-00-dev-stage"
 ```
 
 Execução:
@@ -191,25 +191,25 @@ terraform apply -var-file="terraform.tfvars"
 ## 🚀 Deploy Completo do Projeto dbt + Athena
 
 ```bash
-aws s3 sync ./dbt/ s3://ons-dev-dg-00-stage/dbt/ --exclude "target/*" --exclude "dbt_packages/*" --exclude "logs/*"
-aws s3 cp ./dags/dbt_athena_example.py s3://ons-dev-dg-00-stage/dags/
+aws s3 sync ./dbt/ s3://ons-dg-00-dev-stage/dbt/ --exclude "target/*" --exclude "dbt_packages/*" --exclude "logs/*"
+aws s3 cp ./dags/dbt_athena_example.py s3://ons-dg-00-dev-stage/dags/
 ```
 
 Glue Catalog e Workgroup:
 
 ```bash
 aws glue create-database --database-input '{"Name":"analytics_dev"}'
-aws athena update-work-group --work-group primary --configuration-updates "ResultConfigurationUpdates={OutputLocation=s3://ons-dev-dg-00-stage/athena-results/}"
+aws athena update-work-group --work-group primary --configuration-updates "ResultConfigurationUpdates={OutputLocation=s3://ons-dg-00-dev-stage/athena-results/}"
 ```
 
 Estrutura S3:
 
 ```bash
-aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/staging/
-aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/marts/
-aws s3api put-object --bucket ons-dev-dg-00-stage --key dbt-data/seeds/
-aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/dev/
-aws s3api put-object --bucket ons-dev-dg-00-stage --key athena-results/prod/
+aws s3api put-object --bucket ons-dg-00-dev-stage --key dbt-data/staging/
+aws s3api put-object --bucket ons-dg-00-dev-stage --key dbt-data/marts/
+aws s3api put-object --bucket ons-dg-00-dev-stage --key dbt-data/seeds/
+aws s3api put-object --bucket ons-dg-00-dev-stage --key athena-results/dev/
+aws s3api put-object --bucket ons-dg-00-dev-stage --key athena-results/prod/
 ```
 
 ---

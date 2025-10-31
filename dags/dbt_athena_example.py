@@ -21,9 +21,12 @@ default_args = {
     'email': ['data-team@example.com'],
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 1,
+    'retries': 0,
     'retry_delay': timedelta(minutes=5),
 }
+
+# Bucket S3 hardcoded utilizado em todo o pipeline (evita depender de variáveis de ambiente)
+BUCKET_NAME = "ons-dg-00-dev-stage"
 
 
 def check_aws_and_dbt():
@@ -52,7 +55,7 @@ def check_aws_and_dbt():
     
     # 3. S3 Bucket Access
     print("\n[3/8] S3 Bucket Access Test:")
-    bucket = os.environ.get('AIRFLOW_S3_BUCKET', 'ons-dev-dg-00-stage')
+    bucket = BUCKET_NAME
     result = subprocess.run(['aws', 's3', 'ls', f's3://{bucket}/'], 
                           capture_output=True, text=True)
     print(result.stdout[:500] if result.returncode == 0 else f"ERROR: {result.stderr}")
@@ -150,12 +153,44 @@ with DAG(
     # Task Group: Execução dos modelos dbt
     with TaskGroup('dbt_run_models', tooltip='Execução das transformações dbt') as run_group:
 
+        dbt_seed = BashOperator(
+            task_id='seed_models',
+            bash_command=f'''
+                set -euo pipefail
+                cd /opt/airflow/dbt
+
+                echo "[FORCE SYNC] Baixando profiles.yml atualizado do S3 (bucket={BUCKET_NAME})..."
+                aws s3 ls s3://{BUCKET_NAME}/dbt/profiles.yml || true
+                aws s3 cp s3://{BUCKET_NAME}/dbt/profiles.yml profiles.yml --no-progress || true
+
+                echo "=========================================="
+                echo "DBT SEED (carregar seeds customers.csv e orders.csv)"
+                echo "=========================================="
+                echo ""
+
+                dbt seed --profiles-dir . --target dev --full-refresh 2>&1
+            ''',
+            doc_md="""
+            ### Seed Models
+            Carrega as tabelas base (seeds) como externas no Athena a partir de `seeds/*.csv`.
+            Necessário para que os modelos de staging que usam `ref('customers')` e `ref('orders')` existam.
+            """
+        )
+
         dbt_run_staging = BashOperator(
             task_id='run_staging_models',
-            bash_command='''
+            bash_command=f'''
                 set -euo pipefail
                 cd /opt/airflow/dbt
                 
+                echo "[FORCE SYNC] Baixando profiles.yml atualizado do S3 (bucket={BUCKET_NAME})..."
+                aws s3 ls s3://{BUCKET_NAME}/dbt/profiles.yml || true
+                aws s3 cp s3://{BUCKET_NAME}/dbt/profiles.yml profiles.yml --no-progress || true
+                
+                echo "profiles.yml (s3_* settings) ->"
+                grep -nE "s3_.*_dir|work_group" profiles.yml || true
+                echo ""
+
                 echo "=========================================="
                 echo "DBT RUN STAGING"
                 echo "=========================================="
@@ -209,8 +244,8 @@ with DAG(
             """
         )
 
-        # Sequência de execução dos modelos
-        dbt_run_staging >> dbt_run_intermediate >> dbt_run_marts
+    # Sequência de execução dos modelos
+    dbt_seed >> dbt_run_staging >> dbt_run_intermediate >> dbt_run_marts
 
     # Task Group: Testes de qualidade
     with TaskGroup('dbt_quality_checks', tooltip='Testes de qualidade dos dados') as quality_group:
@@ -238,10 +273,10 @@ with DAG(
     # Task: Gerar documentação
     dbt_docs = BashOperator(
         task_id='generate_documentation',
-        bash_command='''
+        bash_command=f'''
             cd /opt/airflow/dbt && \
             dbt docs generate --profiles-dir . --target dev 2>&1 && \
-            aws s3 sync target/ s3://ons-dev-dg-00-stage/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
+            aws s3 sync target/ s3://{BUCKET_NAME}/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
         ''',
         doc_md="""
         ### Generate dbt Documentation
@@ -269,7 +304,7 @@ Pipeline completo com diagnóstico AWS, self-healing e execução dbt.
 
 ## 🎯 Sincronização Automática
 - Projeto dbt sincronizado do S3 a cada 30s pelo entrypoint.sh
-- Localização S3: `s3://ons-dev-dg-00-stage/dbt/`
+- Localização S3: `s3://ons-dg-00-dev-stage/dbt/`
 - Packages instalados automaticamente se ausentes
 
 ## ⚠️ Troubleshooting

@@ -21,7 +21,7 @@ models:
     staging:
       +materialized: view
       +schema: staging
-      +location_root: "s3://ons-dev-dg-00-stage/dbt-data/staging"
+      +location_root: "s3://ons-dg-00-dev-stage/dbt-data/staging"
       +file_format: parquet
       
     intermediate:
@@ -30,7 +30,7 @@ models:
     marts:
       +materialized: table
       +schema: marts
-      +location_root: "s3://ons-dev-dg-00-stage/dbt-data/marts"
+      +location_root: "s3://ons-dg-00-dev-stage/dbt-data/marts"
       +file_format: parquet
       +partitioned_by: ['year', 'month']
       +table_type: hive
@@ -39,4 +39,4 @@ models:
 
 seeds:
   +file_format: parquet
-  +location_root: "s3://ons-dev-dg-00-stage/dbt-data/seeds"
+  +location_root: "s3://ons-dg-00-dev-stage/dbt-data/seeds"

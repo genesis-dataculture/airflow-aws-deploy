@@ -89,7 +89,7 @@ with DAG(
             echo "=== dbt docs generate ==="
             dbt docs generate --profiles-dir . --target dev 2>&1
             echo "=== sync docs to S3 ==="
-            aws s3 sync target/ s3://ons-dev-dg-00-stage/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
+            aws s3 sync target/ s3://ons-dg-00-dev-stage/dbt-docs/ --exclude "*" --include "*.json" --include "*.html"
         ''',
     )
 
