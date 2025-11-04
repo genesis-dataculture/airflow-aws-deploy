@@ -1,6 +1,6 @@
 output "airflow_ui_url" {
   description = "URL para acessar a interface do Airflow"
-  value       = "http://${module.ecs.airflow_alb_dns}"
+  value       = "https://${module.ecs.airflow_alb_dns}"
 }
 
 # output "s3_bucket_name" {

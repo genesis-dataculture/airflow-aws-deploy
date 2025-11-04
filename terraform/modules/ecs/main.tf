@@ -1,59 +1,101 @@
-# resource "aws_security_group" "airflow_ecs" {
-#   name        = "airflow-ecs-sg"
-#   description = "Security group for Airflow ECS tasks"
-#   vpc_id      = var.vpc_id
+############################################
+# ACM certificate (self-signed files in this folder)
+############################################
+resource "aws_acm_certificate" "airflow" {
+  private_key      = file("${path.module}/airflow-private-key.pem")
+  certificate_body = file("${path.module}/airflow-certificate.pem")
 
-#   ingress {
-#     description = "Airflow Webserver"
-#     from_port   = 8080
-#     to_port     = 8080
-#     protocol    = "tcp"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
+  tags = {
+    Name        = "airflow-self-signed-certificate"
+    Environment = "development"
+  }
 
-#   egress {
-#     from_port   = 0
-#     to_port     = 0
-#     protocol    = "-1"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
+  lifecycle {
+    create_before_destroy = true
+  }
+}
 
-#   tags = {
-#     Name = "airflow-ecs-sg"
-#   }
-# }
+############################################
+# Security Groups
+############################################
+resource "aws_security_group" "airflow_lb" {
+  name        = "airflow-lb-sg"
+  description = "Security group for Airflow load balancer"
+  vpc_id      = var.vpc_id
 
-# resource "aws_security_group" "airflow_lb" {
-#   name        = "airflow-lb-sg"
-#   description = "Security group for Airflow load balancer"
-#   vpc_id      = var.vpc_id
+  # HTTP for redirect to HTTPS
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-#   ingress {
-#     description = "HTTP"
-#     from_port   = 80
-#     to_port     = 80
-#     protocol    = "tcp"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
+  # HTTPS public access
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-#   egress {
-#     from_port   = 0
-#     to_port     = 0
-#     protocol    = "-1"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-#   tags = {
-#     Name = "airflow-lb-sg"
-#   }
-# }
+  tags = {
+    Name = "airflow-lb-sg"
+  }
+}
+
+resource "aws_security_group" "airflow_ecs" {
+  name        = "airflow-ecs-sg"
+  description = "Security group for Airflow ECS tasks"
+  vpc_id      = var.vpc_id
+
+  # Allow only from ALB SG on 8080
+  ingress {
+    description     = "From ALB only"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.airflow_lb.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "airflow-ecs-sg"
+  }
+}
+
+# Optional: ensure RDS SG allows 5432 from new ECS SG (uses first ID from provided list)
+resource "aws_security_group_rule" "rds_allow_from_airflow_ecs" {
+  type                     = "ingress"
+  protocol                 = "tcp"
+  from_port                = 5432
+  to_port                  = 5432
+  security_group_id        = element(var.sg_id, 0)
+  source_security_group_id = aws_security_group.airflow_ecs.id
+  description              = "Allow Postgres from Airflow ECS tasks"
+}
 
 resource "aws_lb" "airflow" {
   # Use a short prefix (max 6 chars) to avoid name collisions if an ALB with the exact name already exists
   name_prefix        = "airfl-"
   internal           = true
   load_balancer_type = "application"
-  security_groups    = var.sg_id
+  security_groups    = [aws_security_group.airflow_lb.id]
   subnets            = var.private_subnet_ids
 
   tags = {
@@ -85,6 +127,25 @@ resource "aws_lb_listener" "airflow" {
   load_balancer_arn = aws_lb.airflow.arn
   port              = 80
   protocol          = "HTTP"
+
+  # Redirect HTTP -> HTTPS
+  default_action {
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# HTTPS listener (TLS 1.3/1.2) forwarding to target group
+resource "aws_lb_listener" "airflow_https" {
+  load_balancer_arn = aws_lb.airflow.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate.airflow.arn
 
   default_action {
     type             = "forward"
@@ -143,7 +204,10 @@ resource "aws_ecs_task_definition" "airflow_webserver" {
         { name = "DBT_PROFILES_DIR", value = "/opt/airflow/dbt" },
         { name = "DBT_PROJECT_DIR", value = "/opt/airflow/dbt" },
         { name = "DBT_ATHENA_S3_STAGING", value = var.s3_bucket_name },
-        { name = "AIRFLOW_S3_DBT_PATH", value = "dbt" }
+        { name = "AIRFLOW_S3_DBT_PATH", value = "dbt" },
+        # --- HTTPS hardening ---
+        { name = "AIRFLOW__WEBSERVER__COOKIE_SECURE", value = "true" },
+        { name = "AIRFLOW__WEBSERVER__X_FRAME_ENABLED", value = "true" }
       ],
 
       portMappings = [
@@ -235,7 +299,7 @@ resource "aws_ecs_service" "airflow_webserver" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = var.sg_id
+    security_groups  = [aws_security_group.airflow_ecs.id]
     assign_public_ip = false
   }
 
@@ -245,7 +309,7 @@ resource "aws_ecs_service" "airflow_webserver" {
     container_port   = 8080
   }
 
-  depends_on = [aws_lb_listener.airflow]
+  depends_on = [aws_lb_listener.airflow, aws_lb_listener.airflow_https]
 }
 
 resource "aws_ecs_service" "airflow_scheduler" {
@@ -257,7 +321,7 @@ resource "aws_ecs_service" "airflow_scheduler" {
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = var.sg_id
+    security_groups  = [aws_security_group.airflow_ecs.id]
     assign_public_ip = false
   }
 }

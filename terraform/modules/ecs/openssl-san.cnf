@@ -1,0 +1,21 @@
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = dn
+req_extensions = v3_req
+
+[dn]
+C=BR
+ST=Sao Paulo
+L=Sao Paulo
+O=Dev
+OU=DevOps
+CN=airflow-alb
+emailAddress=admin@example.com
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = internal-airfl-20251031133640633900000003-16097861.us-east-1.elb.amazonaws.com
