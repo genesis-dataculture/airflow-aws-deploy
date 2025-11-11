@@ -62,6 +62,25 @@ if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
         # SEM --delete para preservar dbt_packages instalados durante o build
         if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --exclude "dbt_packages/*"; then
             echo "[SUCCESS] Projeto dbt sincronizado!"
+            
+            # NOVO: Sync com delete para diretórios de código (preservando dbt_packages e configs)
+            echo "[CLEAN] Limpeza inteligente de arquivos órfãos..."
+            
+            # Sync seletivo com --delete para pastas de código
+            for dir in models macros analyses tests seeds snapshots; do
+                if aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/$dir/ 2>/dev/null | grep -q .; then
+                    echo "[SYNC] $dir/ (com --delete para remover órfãos)"
+                    aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/$dir/ /opt/airflow/dbt/$dir/ --delete || echo "[WARN] Falha no sync de $dir"
+                fi
+            done
+            
+            # Sync configs sem --delete (preserva arquivos locais importantes)
+            echo "[SYNC] Configs e outros arquivos (sem --delete)"
+            aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ \
+                --exclude "models/*" --exclude "macros/*" --exclude "analyses/*" \
+                --exclude "tests/*" --exclude "seeds/*" --exclude "snapshots/*" \
+                --exclude "dbt_packages/*" --exclude "logs/*" --exclude "target/*" || echo "[WARN] Falha no sync de configs"
+            
             echo "[INFO] Packages dbt já instalados na imagem - nenhuma instalação necessária"
             
             # Listar packages instalados
@@ -89,11 +108,20 @@ if [ ! -z "$AIRFLOW_S3_BUCKET" ]; then
             
             (
               while true; do
-                if aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ --exclude "dbt_packages/*" 2>/dev/null; then
-                    echo "[SYNC-DBT] Projeto dbt sincronizado em $(date)"
-                else
-                    echo "[SYNC-DBT] AVISO: Falha na sincronização do projeto dbt em $(date)"
-                fi
+                # Sync seletivo com limpeza para pastas de código
+                for dir in models macros analyses tests seeds snapshots; do
+                    if aws s3 ls s3://${AIRFLOW_S3_BUCKET}/dbt/$dir/ 2>/dev/null | grep -q .; then
+                        aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/$dir/ /opt/airflow/dbt/$dir/ --delete 2>/dev/null || true
+                    fi
+                done
+                
+                # Sync configs sem delete
+                aws s3 sync s3://${AIRFLOW_S3_BUCKET}/dbt/ /opt/airflow/dbt/ \
+                    --exclude "models/*" --exclude "macros/*" --exclude "analyses/*" \
+                    --exclude "tests/*" --exclude "seeds/*" --exclude "snapshots/*" \
+                    --exclude "dbt_packages/*" --exclude "logs/*" --exclude "target/*" 2>/dev/null || true
+                    
+                echo "[SYNC-DBT] Projeto dbt sincronizado com limpeza em $(date)"
                 sleep 30
               done
             ) &

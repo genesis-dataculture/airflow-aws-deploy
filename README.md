@@ -131,7 +131,7 @@ O script abaixo concede permissões `ALL` à IAM Role `airflow-task-execution-ro
 # Script: grant-lakeformation-permissions.ps1
 # ===========================
 
-$roleArn = "arn:aws:iam::730335315247:role/airflow-task-execution-role"
+$roleArn = "arn:aws:iam::124679861210:role/airflow-task-execution-role"
 $databaseName = "analytics_dev"
 
 # 1. Conceder permissões ALL no database
@@ -155,15 +155,15 @@ Write-Host "Permissões concedidas para $roleArn em $databaseName (Database + Ta
 ## ⚙️ Configuração e Deploy do Airflow
 
 ```bash
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 730335315247.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 124679861210.dkr.ecr.us-east-1.amazonaws.com
 
 aws ecr create-repository --repository-name airflow-on-ecs-fargate --region us-east-1
 
 docker build --no-cache -f docker/Dockerfile -t airflow-dbt-athena:latest .
 
-docker tag airflow-dbt-athena:latest 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
+docker tag airflow-dbt-athena:latest 124679861210.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
 
-docker push 730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
+docker push 124679861210.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest
 ```
 
 Terraform `terraform.tfvars`:
@@ -173,8 +173,8 @@ db_name = "airflow"
 aws_region = "us-east-1"
 db_username = "airflow"
 db_password = "airflow12345"
-iam_role_ecs = "arn:aws:iam::730335315247:role/airflow-task-execution-role"
-aws_ecr_repository = "730335315247.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest"
+iam_role_ecs = "arn:aws:iam::124679861210:role/airflow-task-execution-role"
+aws_ecr_repository = "124679861210.dkr.ecr.us-east-1.amazonaws.com/airflow-on-ecs-fargate:latest"
 airflow_bucket_name = "ons-dg-00-dev-stage"
 ```
 
