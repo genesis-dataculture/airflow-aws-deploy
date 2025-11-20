@@ -242,8 +242,8 @@ resource "aws_ecs_task_definition" "airflow_scheduler" {
   family                   = "airflow-scheduler"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = "512"
-  memory                   = "1024"
+  cpu                      = "1024"
+  memory                   = "4096"
   execution_role_arn       = var.iam_role_ecs
   task_role_arn            = var.iam_role_ecs
 
