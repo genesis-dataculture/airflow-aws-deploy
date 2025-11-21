@@ -1,13 +1,38 @@
 ############################################
-# ACM certificate (self-signed files in this folder)
+# ACM certificate (self-signed via TLS provider)
 ############################################
+resource "tls_private_key" "airflow" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "tls_self_signed_cert" "airflow" {
+  private_key_pem = tls_private_key.airflow.private_key_pem
+
+  subject {
+    common_name         = "airflow-${var.cert_environment}"
+    organization        = "Genesis"
+    organizational_unit = "DevOps"
+    country             = "BR"
+  }
+
+  validity_period_hours = 8760
+  allowed_uses = [
+    "key_encipherment",
+    "digital_signature",
+    "server_auth"
+  ]
+
+  dns_names = ["airflow-${var.cert_environment}.local"]
+}
+
 resource "aws_acm_certificate" "airflow" {
-  private_key      = file("${path.module}/airflow-private-key.pem")
-  certificate_body = file("${path.module}/airflow-certificate.pem")
+  private_key      = tls_private_key.airflow.private_key_pem
+  certificate_body = tls_self_signed_cert.airflow.cert_pem
 
   tags = {
     Name        = "airflow-self-signed-certificate"
-    Environment = "development"
+    Environment = var.cert_environment
   }
 
   lifecycle {

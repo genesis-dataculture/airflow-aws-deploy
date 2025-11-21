@@ -1,11 +1,12 @@
 param(
   [Parameter(Mandatory=$true)][string]$CN,
-  [int]$Days = 365
+  [int]$Days = 365,
+  [ValidateSet("dev","prod")][string]$Environment = "dev"
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "Generating self-signed cert for CN=$CN (valid $Days days) in $PSScriptRoot" -ForegroundColor Cyan
+Write-Host "Generating self-signed cert for CN=$CN ($Environment) valid $Days days" -ForegroundColor Cyan
 
 # Create subject
 $dn = New-Object System.Security.Cryptography.X509Certificates.X500DistinguishedName("CN=$CN, O=Dev, OU=DevOps, C=BR")
@@ -47,14 +48,14 @@ $cert = $req.CreateSelfSigned($notBefore, $notAfter)
 $certBytes = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
 $certBase64 = [Convert]::ToBase64String($certBytes, 'InsertLineBreaks')
 $certPem = "-----BEGIN CERTIFICATE-----`r`n$certBase64`r`n-----END CERTIFICATE-----`r`n"
-[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'airflow-certificate.pem'), $certPem)
+[IO.File]::WriteAllText((Join-Path $PSScriptRoot ("airflow-$Environment-certificate.pem")), $certPem)
 
 # Export private key (PKCS#8 -> PEM)
 $pkcs8 = $rsa.ExportPkcs8PrivateKey()
 $keyBase64 = [Convert]::ToBase64String($pkcs8, 'InsertLineBreaks')
 $keyPem = "-----BEGIN PRIVATE KEY-----`r`n$keyBase64`r`n-----END PRIVATE KEY-----`r`n"
-[IO.File]::WriteAllText((Join-Path $PSScriptRoot 'airflow-private-key.pem'), $keyPem)
+[IO.File]::WriteAllText((Join-Path $PSScriptRoot ("airflow-$Environment-private-key.pem")), $keyPem)
 
 Write-Host "Generated files:" -ForegroundColor Green
-Write-Host (Join-Path $PSScriptRoot 'airflow-private-key.pem')
-Write-Host (Join-Path $PSScriptRoot 'airflow-certificate.pem')
+Write-Host (Join-Path $PSScriptRoot ("airflow-$Environment-private-key.pem"))
+Write-Host (Join-Path $PSScriptRoot ("airflow-$Environment-certificate.pem"))

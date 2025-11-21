@@ -38,3 +38,13 @@ variable "db_connection_string" {
   type        = string
   sensitive   = true
 }
+
+variable "cert_environment" {
+  description = "Ambiente do certificado (dev|prod)"
+  type        = string
+  default     = "dev"
+  validation {
+    condition     = contains(["dev", "prod"], var.cert_environment)
+    error_message = "cert_environment deve ser 'dev' ou 'prod'."
+  }
+}

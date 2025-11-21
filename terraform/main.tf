@@ -31,4 +31,5 @@ module "ecs" {
   s3_bucket_name       = var.airflow_bucket_name
   db_connection_string = "postgresql://${var.db_username}:${var.db_password}@${module.rds.db_instance_endpoint}/${var.db_name}"
   sg_id                = [var.sg_id]
+  cert_environment     = var.cert_environment
 }

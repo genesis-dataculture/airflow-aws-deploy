@@ -49,3 +49,13 @@ variable "sg_id" {
   description = "ID do Security Group"
   type        = string
 }
+
+variable "cert_environment" {
+  description = "Ambiente do certificado (dev ou prod)"
+  type        = string
+  default     = "dev"
+  validation {
+    condition     = contains(["dev", "prod"], var.cert_environment)
+    error_message = "cert_environment deve ser 'dev' ou 'prod'."
+  }
+}
